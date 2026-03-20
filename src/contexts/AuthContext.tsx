@@ -172,6 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user');
     setUser(null);
     toast.success('Logged out successfully');
+    window.location.assign('/login');
   };
 
   const updateProfile = async (profileData: any): Promise<boolean> => {

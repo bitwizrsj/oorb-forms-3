@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({ showAuthButtons = true }) => {
     // Check if user is logged in
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
+
     if (token && userData) {
       try {
         setUser(JSON.parse(userData));
@@ -40,6 +40,7 @@ const Header: React.FC<HeaderProps> = ({ showAuthButtons = true }) => {
     setUser(null);
     setShowUserMenu(false);
     toast.success('Logged out successfully');
+    window.location.assign('/login');
   };
 
   const openAuthModal = (mode: 'login' | 'signup') => {
