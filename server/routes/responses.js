@@ -1,0 +1,322 @@
+import express from 'express';
+import Response from '../models/Response.js';
+import Form from '../models/Form.js';
+import { authenticateToken } from '../middleware/auth.js';
+import { createTransport } from 'nodemailer';
+import multer from 'multer';
+import { google } from 'googleapis';
+import User from '../models/User.js';
+import stream from 'stream';
+import fs from 'fs';
+
+const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+const logDebug = (msg) => {
+  fs.appendFileSync('upload-debug.log', new Date().toISOString() + ' - ' + msg + '\n');
+  console.log('UPLOAD DEBUG:', msg);
+};
+
+// Email transporter setup
+const transporter = createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+// Upload file endpoint
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    logDebug('Upload started for file: ' + (req.file ? req.file.originalname : 'no-file'));
+    const { formId, fieldId } = req.body;
+    const file = req.file;
+
+    if (!file) {
+      logDebug('No file found');
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    logDebug(`Looking up form ${formId} and field ${fieldId}`);
+    const form = await Form.findById(formId);
+    if (!form) {
+      logDebug('Form not found');
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    const creator = await User.findById(form.createdBy);
+    if (!creator) {
+      logDebug('Creator not found');
+      return res.json({ url: `https://fake-mock-storage.com/${file.originalname}` });
+    }
+
+    if (!creator.googleRefreshToken) {
+      logDebug(`Creator ${creator.email} has NO googleRefreshToken`);
+      return res.json({ url: `https://fake-mock-storage.com/${file.originalname}` });
+    }
+
+    logDebug(`Creator ${creator.email} has refresh token: ${creator.googleRefreshToken.substring(0, 10)}...`);
+
+    const field = form.fields.find(f => f.id === fieldId);
+    let folderId = field?.googleDriveFolderId; // Target folder
+    logDebug(`Initial folder ID from field: ${folderId}`);
+
+    if (folderId && folderId.includes('folders/')) {
+      const parts = folderId.split('folders/');
+      if (parts.length > 1) {
+        folderId = parts[1].split('?')[0].split('/')[0];
+      }
+    }
+    logDebug(`Computed folder ID: ${folderId}`);
+
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    oauth2Client.setCredentials({ refresh_token: creator.googleRefreshToken });
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(file.buffer);
+
+    const driveBody = {
+      name: file.originalname,
+      parents: folderId ? [folderId] : []
+    };
+
+    logDebug('Calling Google Drive API to create file...');
+    const driveResponse = await drive.files.create({
+      requestBody: driveBody,
+      media: {
+        mimeType: file.mimetype,
+        body: bufferStream
+      },
+      fields: 'id, webViewLink'
+    });
+
+    logDebug(`File created with ID ${driveResponse.data.id}, setting permissions...`);
+
+    // Make public so admin can easily view link in responses
+    await drive.permissions.create({
+      fileId: driveResponse.data.id,
+      requestBody: { role: 'reader', type: 'anyone' }
+    });
+
+    logDebug('Permissions set, returning URL: ' + driveResponse.data.webViewLink);
+    res.json({ url: driveResponse.data.webViewLink });
+  } catch (error) {
+    logDebug(`Upload error executing drive request: ${error.message} - ${error.stack}`);
+    res.status(500).json({ error: 'File upload failed: ' + error.message });
+  }
+});
+
+// Submit form response (public - no authentication needed)
+router.post('/', async (req, res) => {
+  try {
+    const { formId, responses, submitterInfo, completionTime, userId } = req.body;
+
+    // Verify form exists and is published
+    const form = await Form.findById(formId);
+    if (!form) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    if (form.status !== 'published') {
+      return res.status(400).json({ error: 'Form is not published' });
+    }
+
+    // Create response
+    const response = new Response({
+      formId,
+      responses,
+      submitterInfo: {
+        ...submitterInfo,
+        userId: userId || submitterInfo?.userId,
+        savedToAccount: !!userId
+      },
+      completionTime,
+      submittedAt: new Date()
+    });
+
+    await response.save();
+
+    // Update form response count
+    form.responses += 1;
+    form.completionRate = form.views > 0 ? (form.responses / form.views) * 100 : 0;
+    await form.save();
+
+    // Send email notification (if configured)
+    if (process.env.EMAIL_USER) {
+      try {
+        const emailContent = responses.map(r =>
+          `${r.fieldLabel}: ${Array.isArray(r.value) ? r.value.join(', ') : r.value}`
+        ).join('\n');
+
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: process.env.EMAIL_USER, // Send to admin
+          subject: `New Response: ${form.title}`,
+          text: `New form response received:\n\n${emailContent}\n\nSubmitted at: ${new Date().toLocaleString()}`
+        });
+      } catch (emailError) {
+        console.error('Email notification failed:', emailError);
+      }
+    }
+
+    res.status(201).json({
+      message: 'Response submitted successfully',
+      responseId: response._id
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get responses for a form (only if user owns the form)
+router.get('/form/:formId', authenticateToken, async (req, res) => {
+  try {
+    console.log('Responses route - Getting responses for form:', req.params.formId, 'by user:', req.user._id);
+    console.log('Responses route - User object:', {
+      id: req.user._id,
+      email: req.user.email,
+      name: req.user.name
+    });
+
+    // Verify user owns the form
+    const form = await Form.findOne({
+      _id: req.params.formId,
+      createdBy: req.user._id
+    });
+
+    console.log('Responses route - Form query result:', form ? 'Found' : 'Not found');
+
+    if (!form) {
+      console.log('Responses route - Form not found or access denied for form:', req.params.formId);
+      return res.status(403).json({ error: 'Form not found or access denied' });
+    }
+
+    const { page = 1, limit = 10 } = req.query;
+    console.log('Responses route - Pagination params:', { page, limit });
+
+    const skip = (page - 1) * limit;
+
+    const responses = await Response.find({ formId: req.params.formId })
+      .sort({ submittedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Response.countDocuments({ formId: req.params.formId });
+
+    console.log('Responses route - Found', responses.length, 'responses out of', total, 'total');
+
+    res.json({
+      responses,
+      pagination: {
+        current: parseInt(page),
+        total: Math.ceil(total / limit),
+        count: total
+      }
+    });
+  } catch (error) {
+    console.error('Responses route - Error getting responses:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single response (only if user owns the form)
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    console.log('Responses route - Getting single response:', req.params.id, 'by user:', req.user._id);
+
+    const response = await Response.findById(req.params.id).populate('formId');
+    if (!response) {
+      return res.status(404).json({ error: 'Response not found' });
+    }
+
+    // Verify user owns the form
+    const form = await Form.findOne({
+      _id: response.formId,
+      createdBy: req.user._id
+    });
+
+    if (!form) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete response (only if user owns the form)
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    console.log('Responses route - Deleting response:', req.params.id, 'by user:', req.user._id);
+
+    const response = await Response.findById(req.params.id);
+    if (!response) {
+      return res.status(404).json({ error: 'Response not found' });
+    }
+
+    // Verify user owns the form
+    const form = await Form.findOne({
+      _id: response.formId,
+      createdBy: req.user._id
+    });
+
+    if (!form) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await Response.findByIdAndDelete(req.params.id);
+
+    // Update form response count
+    if (form) {
+      form.responses = Math.max(0, form.responses - 1);
+      form.completionRate = form.views > 0 ? (form.responses / form.views) * 100 : 0;
+      await form.save();
+    }
+
+    res.json({ message: 'Response deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user's own responses (forms they've submitted to)
+router.get('/my-responses', authenticateToken, async (req, res) => {
+  try {
+    console.log('My responses route - Getting responses for user:', req.user._id);
+
+    const responses = await Response.find({
+      'submitterInfo.userId': req.user._id,
+      'submitterInfo.savedToAccount': true
+    })
+      .populate('formId', 'title description')
+      .sort({ submittedAt: -1 });
+
+    const formattedResponses = responses.map(response => ({
+      _id: response._id,
+      formId: response.formId._id,
+      formTitle: response.formId.title,
+      responses: response.responses,
+      submittedAt: response.submittedAt,
+      completionTime: response.completionTime
+    }));
+
+    console.log('My responses route - Found', formattedResponses.length, 'responses');
+    res.json(formattedResponses);
+  } catch (error) {
+    console.error('My responses route - Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
