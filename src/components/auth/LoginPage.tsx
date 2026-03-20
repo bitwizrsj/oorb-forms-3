@@ -351,7 +351,7 @@ const LoginPage: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
                 window.location.href = `${apiUrl}/auth/google/login`;
               }}
               className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
