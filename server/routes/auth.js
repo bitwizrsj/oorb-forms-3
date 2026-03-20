@@ -177,7 +177,7 @@ router.post('/logout', (req, res) => {
 // Google Login Redirect
 router.get('/google/login', (req, res) => {
   try {
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5001/api/auth/google/callback';
+    const redirectUri = process.env.GOOGLE_AUTH_REDIRECT_URI || 'http://localhost:5001/api/auth/google/callback';
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -199,7 +199,7 @@ router.get('/google/callback', async (req, res) => {
   const { code } = req.query;
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   try {
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5001/api/auth/google/callback';
+    const redirectUri = process.env.GOOGLE_AUTH_REDIRECT_URI || 'http://localhost:5001/api/auth/google/callback';
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
