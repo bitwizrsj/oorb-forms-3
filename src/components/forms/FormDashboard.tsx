@@ -184,7 +184,7 @@ const FormDashboard: React.FC<FormDashboardProps> = ({ onCreateForm, onEditForm,
     if (activeDropdown !== item._id) return null;
     const isFolder = type === 'folder';
     return (
-      <div className="absolute right-0 top-8 w-52 bg-white rounded-2xl shadow-2xl border border-slate-100 py-1.5 z-50" onClick={e => e.stopPropagation()}>
+      <div className="absolute right-0 top-8 w-52 bg-white rounded-2xl shadow-2xl border border-slate-100 py-1.5 z-50" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
         {isFolder ? <>
           <CtxBtn icon={FolderOpen} label="Open" onClick={() => { setOpenFolderModal(item as FolderItem); setActiveDropdown(null); }} />
           <CtxBtn icon={Edit} label="Edit Folder" onClick={() => { setSelectedFolder(item as FolderItem); setShowFolderModal(true); setActiveDropdown(null); }} />
@@ -248,7 +248,7 @@ const FormDashboard: React.FC<FormDashboardProps> = ({ onCreateForm, onEditForm,
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New Form</span>
             </button>
-            <div className="relative" onClick={e => e.stopPropagation()}>
+            <div className="relative" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
               <button onClick={() => setShowProfileDropdown(p => !p)}
                 className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-slate-200 hover:ring-indigo-400 transition-all">
                 {user?.avatar
