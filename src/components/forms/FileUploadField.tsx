@@ -10,6 +10,7 @@ interface FileUploadFieldProps {
   multiple?: boolean;
   formId: string;
   fieldId: string;
+  subfolderName?: string;
 }
 
 const FileUploadField: React.FC<FileUploadFieldProps> = ({
@@ -19,7 +20,8 @@ const FileUploadField: React.FC<FileUploadFieldProps> = ({
   maxSize = 10,
   multiple = false,
   formId,
-  fieldId
+  fieldId,
+  subfolderName
 }) => {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -29,6 +31,9 @@ const FileUploadField: React.FC<FileUploadFieldProps> = ({
     formData.append('file', file);
     formData.append('formId', formId);
     formData.append('fieldId', fieldId);
+    if (subfolderName) {
+      formData.append('subfolderName', subfolderName);
+    }
 
     try {
       const response = await responseAPI.uploadFile(formData);

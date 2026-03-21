@@ -33,7 +33,7 @@ const transporter = createTransport({
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     logDebug('Upload started for file: ' + (req.file ? req.file.originalname : 'no-file'));
-    const { formId, fieldId } = req.body;
+    const { formId, fieldId, subfolderName } = req.body;
     const file = req.file;
 
     if (!file) {
@@ -82,12 +82,48 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
+    // --- Dynamic Subfolder Logic ---
+    let finalFolderId = folderId;
+    if (folderId && subfolderName) {
+      const sanitizedTitle = subfolderName.trim();
+      logDebug(`Looking for subfolder '${sanitizedTitle}' inside parent ${folderId}`);
+
+      try {
+        // Search if subfolder already exists in this parent
+        const searchRes = await drive.files.list({
+          q: `mimeType='application/vnd.google-apps.folder' and '${folderId}' in parents and name='${sanitizedTitle}' and trashed=false`,
+          fields: 'files(id, name)',
+          spaces: 'drive'
+        });
+
+        if (searchRes.data.files && searchRes.data.files.length > 0) {
+          finalFolderId = searchRes.data.files[0].id; // Use existing
+          logDebug(`Found existing subfolder ID: ${finalFolderId}`);
+        } else {
+          // Create new subfolder
+          logDebug(`Subfolder not found, creating new folder '${sanitizedTitle}'`);
+          const createRes = await drive.files.create({
+            requestBody: {
+              name: sanitizedTitle,
+              mimeType: 'application/vnd.google-apps.folder',
+              parents: [folderId]
+            },
+            fields: 'id'
+          });
+          finalFolderId = createRes.data.id;
+          logDebug(`Created new subfolder ID: ${finalFolderId}`);
+        }
+      } catch (err) {
+        logDebug(`Error resolving subfolder: ${err.message}. Falling back to parent folder.`);
+      }
+    }
+
     const bufferStream = new stream.PassThrough();
     bufferStream.end(file.buffer);
 
     const driveBody = {
       name: file.originalname,
-      parents: folderId ? [folderId] : []
+      parents: finalFolderId ? [finalFolderId] : []
     };
 
     logDebug('Calling Google Drive API to create file...');

@@ -358,7 +358,14 @@ const FormRenderer: React.FC = () => {
           </div>
         );
 
-      case 'file':
+      case 'file': {
+        // Dynamically search for a field labeled 'Name', 'Student Name', 'Full Name', etc.
+        const nameField = form?.fields.find(f =>
+          f.label.toLowerCase().includes('name') &&
+          (f.type === 'text' || f.type === 'select')
+        );
+        const derivedSubfolderName = nameField ? responses[nameField.id] : undefined;
+
         return (
           <div>
             <FileUploadField
@@ -368,6 +375,7 @@ const FormRenderer: React.FC = () => {
               maxSize={10}
               formId={form!._id}
               fieldId={field.id}
+              subfolderName={derivedSubfolderName}
             />
             {errors[field.id] && (
               <div className="flex items-center space-x-1 mt-1 text-red-600 text-sm">
@@ -377,6 +385,7 @@ const FormRenderer: React.FC = () => {
             )}
           </div>
         );
+      }
 
       case 'rating':
         return (
