@@ -163,7 +163,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
       primaryColor: '#3B82F6',
       backgroundColor: '#FFFFFF'
     },
-    expiryDate: null as string | null
+    expiryDate: null as string | Date | null
   });
   const [domainInput, setDomainInput] = useState('');
 
