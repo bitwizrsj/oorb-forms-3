@@ -58,3 +58,13 @@
     at async OAuth2Client.requestAsync (C:\Users\Hp\Downloads\oorb-forms-2-main\oorb-forms-2-main\node_modules\google-auth-library\build\src\auth\oauth2client.js:463:20)
     at async createAPIRequestAsync (C:\Users\Hp\Downloads\oorb-forms-2-main\oorb-forms-2-main\node_modules\googleapis-common\build\src\apirequest.js:308:25)
     at async file:///C:/Users/Hp/Downloads/oorb-forms-2-main/oorb-forms-2-main/server/routes/responses.js:94:27
+2026-04-02T10:43:05.218Z - Upload started for file: AccountStatement_23032026_204316.pdf
+2026-04-02T10:43:10.148Z - Upload error: Password-protected PDFs are not supported - undefined
+2026-04-02T11:29:15.012Z - Upload started for file: AccountStatement_23032026_204316.pdf
+2026-04-02T11:29:20.337Z - Upload error: Password-protected PDFs are not supported - undefined
+2026-04-02T11:31:32.548Z - Upload started for file: AccountStatement_23032026_204316.pdf
+2026-04-02T11:31:39.443Z - Upload error: Password-protected PDFs are not supported - undefined
+2026-04-02T11:32:07.996Z - Upload started for file: Chandni Upadhyay Offer Letter (2).pdf
+2026-04-02T11:32:12.680Z - File uploaded to Cloudinary: https://res.cloudinary.com/dhptwwxjn/image/upload/v1775129533/form-responses/file_mwevkk.pdf
+2026-04-02T11:42:04.474Z - Upload started for file: 11e91979-770c-4c0d-85aa-515a8c6a7c45.png
+2026-04-02T11:42:11.095Z - File uploaded to Cloudinary: https://res.cloudinary.com/dhptwwxjn/image/upload/v1775130131/form-responses/file_achd3o.png

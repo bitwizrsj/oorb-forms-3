@@ -4,16 +4,18 @@ import Form from '../models/Form.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { createTransport } from 'nodemailer';
 import multer from 'multer';
-import { google } from 'googleapis';
-import User from '../models/User.js';
-import stream from 'stream';
 import fs from 'fs';
+import cloudinary from '../services/cloudinary.js';
 
 const router = express.Router();
 
+// Use memory storage — we'll manually stream to Cloudinary so we can set resource_type: 'auto'
 const upload = multer({ storage: multer.memoryStorage() });
 
 const logDebug = (msg) => {
+  if (!fs.existsSync('upload-debug.log')) {
+    fs.writeFileSync('upload-debug.log', '');
+  }
   fs.appendFileSync('upload-debug.log', new Date().toISOString() + ' - ' + msg + '\n');
   console.log('UPLOAD DEBUG:', msg);
 };
@@ -33,121 +35,33 @@ const transporter = createTransport({
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     logDebug('Upload started for file: ' + (req.file ? req.file.originalname : 'no-file'));
-    const { formId, fieldId, subfolderName } = req.body;
-    const file = req.file;
 
-    if (!file) {
+    if (!req.file) {
       logDebug('No file found');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    logDebug(`Looking up form ${formId} and field ${fieldId}`);
-    const form = await Form.findById(formId);
-    if (!form) {
-      logDebug('Form not found');
-      return res.status(404).json({ error: 'Form not found' });
-    }
-
-    const creator = await User.findById(form.createdBy);
-    if (!creator) {
-      logDebug('Creator not found');
-      return res.json({ url: `https://fake-mock-storage.com/${file.originalname}` });
-    }
-
-    if (!creator.googleRefreshToken) {
-      logDebug(`Creator ${creator.email} has NO googleRefreshToken`);
-      return res.json({ url: `https://fake-mock-storage.com/${file.originalname}` });
-    }
-
-    logDebug(`Creator ${creator.email} has refresh token: ${creator.googleRefreshToken.substring(0, 10)}...`);
-
-    const field = form.fields.find(f => f.id === fieldId);
-    let folderId = field?.googleDriveFolderId; // Target folder
-    logDebug(`Initial folder ID from field: ${folderId}`);
-
-    if (folderId && folderId.includes('folders/')) {
-      const parts = folderId.split('folders/');
-      if (parts.length > 1) {
-        folderId = parts[1].split('?')[0].split('/')[0];
-      }
-    }
-    logDebug(`Computed folder ID: ${folderId}`);
-
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
-    oauth2Client.setCredentials({ refresh_token: creator.googleRefreshToken });
-
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
-
-    // --- Dynamic Subfolder Logic ---
-    let finalFolderId = folderId;
-    if (folderId && subfolderName) {
-      const sanitizedTitle = subfolderName.trim();
-      logDebug(`Looking for subfolder '${sanitizedTitle}' inside parent ${folderId}`);
-
-      try {
-        // Search if subfolder already exists in this parent
-        const searchRes = await drive.files.list({
-          q: `mimeType='application/vnd.google-apps.folder' and '${folderId}' in parents and name='${sanitizedTitle}' and trashed=false`,
-          fields: 'files(id, name)',
-          spaces: 'drive'
-        });
-
-        if (searchRes.data.files && searchRes.data.files.length > 0) {
-          finalFolderId = searchRes.data.files[0].id; // Use existing
-          logDebug(`Found existing subfolder ID: ${finalFolderId}`);
-        } else {
-          // Create new subfolder
-          logDebug(`Subfolder not found, creating new folder '${sanitizedTitle}'`);
-          const createRes = await drive.files.create({
-            requestBody: {
-              name: sanitizedTitle,
-              mimeType: 'application/vnd.google-apps.folder',
-              parents: [folderId]
-            },
-            fields: 'id'
-          });
-          finalFolderId = createRes.data.id;
-          logDebug(`Created new subfolder ID: ${finalFolderId}`);
+    // Stream buffer to Cloudinary with resource_type: auto so ALL file types work
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'form-responses',
+          resource_type: 'auto',
+          use_filename: true,
+          unique_filename: true,
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
         }
-      } catch (err) {
-        logDebug(`Error resolving subfolder: ${err.message}. Falling back to parent folder.`);
-      }
-    }
-
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(file.buffer);
-
-    const driveBody = {
-      name: file.originalname,
-      parents: finalFolderId ? [finalFolderId] : []
-    };
-
-    logDebug('Calling Google Drive API to create file...');
-    const driveResponse = await drive.files.create({
-      requestBody: driveBody,
-      media: {
-        mimeType: file.mimetype,
-        body: bufferStream
-      },
-      fields: 'id, webViewLink'
+      );
+      stream.end(req.file.buffer);
     });
 
-    logDebug(`File created with ID ${driveResponse.data.id}, setting permissions...`);
-
-    // Make public so admin can easily view link in responses
-    await drive.permissions.create({
-      fileId: driveResponse.data.id,
-      requestBody: { role: 'reader', type: 'anyone' }
-    });
-
-    logDebug('Permissions set, returning URL: ' + driveResponse.data.webViewLink);
-    res.json({ url: driveResponse.data.webViewLink });
+    logDebug('File uploaded to Cloudinary: ' + uploadResult.secure_url);
+    res.json({ url: uploadResult.secure_url });
   } catch (error) {
-    logDebug(`Upload error executing drive request: ${error.message} - ${error.stack}`);
+    logDebug(`Upload error: ${error.message} - ${error.stack}`);
     res.status(500).json({ error: 'File upload failed: ' + error.message });
   }
 });

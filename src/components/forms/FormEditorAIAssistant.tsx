@@ -135,7 +135,7 @@ Instructions:
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 flex flex-col items-end max-w-[calc(100vw-2rem)]">
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -143,7 +143,7 @@ Instructions:
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="mb-4 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col"
+                        className="mb-4 w-[min(24rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-2xl border border-indigo-100 overflow-hidden flex flex-col"
                         style={{ height: '500px', maxHeight: '70vh' }}
                     >
                         {/* Header */}

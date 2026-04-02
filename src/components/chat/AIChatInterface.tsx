@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Send, Bot, User, Sparkles, Loader2, Wand2,
     X, Search, FileText, Clock, LogOut, Plus,
-    ChevronRight, ChevronLeft, Settings, Home
+    ChevronRight, ChevronLeft, Settings, Home, Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formAPI } from '../../services/api';
@@ -446,6 +446,7 @@ const AIChatInterface: React.FC = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(true);
     const [sidebarMinimized, setSidebarMinimized] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const navigate = useNavigate();
@@ -458,6 +459,15 @@ const AIChatInterface: React.FC = () => {
             el.textContent = scrollbarCSS;
             document.head.appendChild(el);
         }
+    }, []);
+
+    useEffect(() => {
+        const onResize = () => {
+            // Close mobile sidebar when leaving mobile breakpoint
+            if (window.innerWidth >= 768) setMobileSidebarOpen(false);
+        };
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
     useEffect(() => {
@@ -565,8 +575,8 @@ const AIChatInterface: React.FC = () => {
                 <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
             </div>
 
-            {/* Sidebar */}
-            <div className="relative z-20 shrink-0">
+            {/* Sidebar (desktop) */}
+            <div className="relative z-20 shrink-0 hidden md:block">
                 <DarkSidebar
                     onCreateForm={() => navigate('/oorb-forms')}
                     onEditForm={(id) => navigateToForm(id)}
@@ -575,12 +585,37 @@ const AIChatInterface: React.FC = () => {
                 />
             </div>
 
+            {/* Sidebar (mobile drawer) */}
+            {mobileSidebarOpen && (
+                <div className="fixed inset-0 z-50 md:hidden">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        onClick={() => setMobileSidebarOpen(false)}
+                    />
+                    <div className="relative z-10 h-full w-72 max-w-[85vw] shadow-2xl">
+                        <DarkSidebar
+                            onCreateForm={() => { setMobileSidebarOpen(false); navigate('/oorb-forms'); }}
+                            onEditForm={(id) => { setMobileSidebarOpen(false); navigateToForm(id); }}
+                            isMinimized={false}
+                            onToggle={() => { }}
+                        />
+                    </div>
+                </div>
+            )}
+
             {/* Chat panel */}
             <div className="relative z-10 flex-1 flex flex-col min-w-0">
 
                 {/* Header */}
-                <header className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] backdrop-blur-xl bg-black/20 shrink-0">
+                <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/[0.06] backdrop-blur-xl bg-black/20 shrink-0">
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setMobileSidebarOpen(true)}
+                            className="md:hidden p-2 -ml-2 rounded-xl hover:bg-white/[0.07] text-gray-300 hover:text-white transition-colors"
+                            aria-label="Open sidebar"
+                        >
+                            <Menu className="w-4 h-4" />
+                        </button>
                         <div className="w-7 h-7 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-900/40">
                             <Sparkles className="w-3.5 h-3.5 text-white" />
                         </div>

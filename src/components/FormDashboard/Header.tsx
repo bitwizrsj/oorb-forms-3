@@ -10,8 +10,8 @@ const Header: React.FC = () => {
   const { searchTerm, setSearchTerm } = useDashboard();
 
   return (
-    <div className="fixed w-full md:w-auto lg:left-64 lg:right-0 bg-transparent z-30">
-      <div className="px-4 sm:px-6 py-4">
+    <div className="sticky top-0 w-full bg-transparent z-30">
+      <div className="px-4 sm:px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/70">
         <div className="flex items-center justify-between">
           <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
             <div className="relative">

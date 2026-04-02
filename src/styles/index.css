@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  /* Prevent accidental horizontal scroll on mobile due to wide children (tables, code, etc.) */
+  body {
+    overflow-x: hidden;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Reasonable default wrapping (don't break UI labels letter-by-letter) */
+  body {
+    overflow-wrap: break-word;
+  }
+}
+
+@layer utilities {
+  /* Opt-in utility for content that may contain long URLs/tokens */
+  .oorb-wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
+}

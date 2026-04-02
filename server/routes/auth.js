@@ -7,7 +7,7 @@ import { authenticateToken } from '../middleware/auth.js';
 const router = express.Router();
 
 // JWT Secret (in production, use environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-here';
 
 // Register
 router.post('/register', async (req, res) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Star, Upload, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { Star, Upload, Send, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { formAPI, responseAPI } from '../../services/api';
 import FormHeader from './FormHeader';
 import ResponseSavePrompt from './ResponseSavePrompt';
@@ -31,14 +31,17 @@ interface Form {
   description: string;
   fields: FormField[];
   status: string;
+  headerImage?: string;
   settings?: {
     requireLogin?: boolean;
     allowMultipleResponses?: boolean;
     showProgressBar?: boolean;
+    headerImage?: string;
   };
   views?: number;
   responses?: number;
   createdAt?: string;
+  estimatedTime?: number;
 }
 
 const FormRenderer: React.FC = () => {
@@ -505,27 +508,148 @@ const FormRenderer: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#F0F4F8] pb-12">
       <FormHeader form={form} />
 
-      {/* Login Required Modal */}
-      {showLoginRequired && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-sm shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Login Required</h3>
+      <div className="max-w-4xl mx-auto px-4 relative z-10">
+        <div className="bg-white rounded-b-[24px] shadow-sm border-x border-b border-slate-100 overflow-hidden -mt-1">
+          {/* Progress Bar */}
+          {form.settings?.showProgressBar && form.fields.length > 0 && (
+            <div className="h-1.5 w-full bg-slate-50">
+              <div
+                className="bg-indigo-600 h-full rounded-r-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(79,70,229,0.4)]"
+                style={{ width: `${(Object.keys(responses).length / form.fields.length) * 100}%` }}
+              />
             </div>
-            <div className="p-6">
-              <p className="text-gray-600 mb-4">
-                This form requires you to be logged in to submit a response.
-              </p>
-              <div className="flex space-x-3">
+          )}
+
+          <div className="p-4 sm:p-10 lg:p-12 sm:pt-0">
+            {/* User Status Indicator */}
+            <div className="mb-6 sm:mb-10 p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between">
+              <div className="flex items-center space-x-3">
+                <div className={`w-2.5 h-2.5 rounded-full ${user ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Account</span>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {user ? user.email : 'Anonymous Responder'}
+                  </span>
+                </div>
+              </div>
+              {!user && (
                 <button
                   onClick={() => {
                     localStorage.setItem('returnUrl', window.location.pathname);
                     window.location.href = '/login';
                   }}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-full hover:bg-slate-50 transition-colors"
+                >
+                  Sign in
+                </button>
+              )}
+            </div>
+
+            {/* Login Requirement Notice */}
+            {form.settings?.requireLogin && !user && !showLoginRequired && (
+              <div className="mb-10 p-6 bg-amber-50 border border-amber-100 rounded-2xl flex gap-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-amber-900 mb-1">Sign in required</h4>
+                  <p className="text-sm text-amber-700 mb-4">
+                    You must be signed in to submit this form. Your progress will be saved once you log in.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('returnUrl', window.location.pathname);
+                        window.location.href = '/login';
+                      }}
+                      className="px-4 py-2 bg-amber-600 text-white font-bold rounded-xl text-sm hover:bg-amber-700 shadow-sm shadow-amber-200 transition-all"
+                    >
+                      Sign In Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-10">
+              {form.fields.map((field, idx) => (
+                <div 
+                  key={field.id} 
+                  className="group transition-all duration-300"
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                >
+                  <label className="block text-[15px] font-bold text-slate-800 mb-4 group-focus-within:text-indigo-600 transition-colors">
+                    {field.label}
+                    {field.required && <span className="text-rose-500 ml-1.5">*</span>}
+                  </label>
+                  <div className="relative">
+                    {renderField(field)}
+                  </div>
+                </div>
+              ))}
+
+              <div className="pt-8 border-t border-slate-50">
+                <button
+                  type="submit"
+                  disabled={submitting || (form.settings?.requireLogin && !user)}
+                  className="w-full flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 active:scale-[0.98]"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white mr-3"></div>
+                      Submitting Response...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5 mr-3" />
+                      Submit Form
+                    </>
+                  )}
+                </button>
+                <div className="mt-6 text-center">
+                  <p className="text-xs text-slate-400 font-medium">
+                    Never submit passwords through OORB Forms. 
+                    <a href="#" className="text-indigo-500 ml-1 hover:underline">Report Abuse</a>
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="mt-12 text-center pb-8 border-t border-slate-200 pt-8">
+          <p className="text-sm font-bold text-slate-400 tracking-wide uppercase">Powered by</p>
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <FileText size={16} className="text-white" />
+            </div>
+            <span className="text-xl font-black text-slate-900 tracking-tight">OORB<span className="text-indigo-600">FORMS</span></span>
+          </div>
+        </div>
+      </div>
+
+      {/* Login Required Modal */}
+      {showLoginRequired && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-xl font-bold text-slate-900">Login Required</h3>
+            </div>
+            <div className="p-8">
+              <p className="text-slate-600 mb-8 leading-relaxed">
+                This form requires you to be logged in to submit a response. This helps us ensure data integrity and security.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => {
+                    localStorage.setItem('returnUrl', window.location.pathname);
+                    window.location.href = '/login';
+                  }}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all active:scale-[0.98] shadow-md shadow-indigo-100"
                 >
                   Sign In
                 </button>
@@ -534,7 +658,7 @@ const FormRenderer: React.FC = () => {
                     localStorage.setItem('returnUrl', window.location.pathname);
                     window.location.href = '/register';
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-6 py-3 border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all active:scale-[0.98]"
                 >
                   Sign Up
                 </button>
@@ -543,125 +667,6 @@ const FormRenderer: React.FC = () => {
           </div>
         </div>
       )}
-
-      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-        {/* User Status Indicator */}
-        <div className="mb-4">
-          <div className="bg-white rounded-sm border border-gray-200 p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {user ? (
-                  <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-gray-600">
-                      Filling as: <span className="font-medium text-gray-900">{user.email}</span>
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                    <span className="text-sm text-gray-600">
-                      Filling as: <span className="font-medium text-gray-900">Anonymous</span>
-                    </span>
-                  </>
-                )}
-              </div>
-              {!user && (
-                <button
-                  onClick={() => {
-                    localStorage.setItem('returnUrl', window.location.pathname);
-                    window.location.href = '/login';
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700"
-                >
-                  Sign in
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-sm shadow-sm border border-gray-200 p-6 sm:p-8">
-          {/* Progress Bar */}
-          {form.settings?.showProgressBar && form.fields.length > 5 && (
-            <div className="mb-6 sm:mb-8">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>Progress</span>
-                <span>{Math.round((Object.keys(responses).length / form.fields.length) * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(Object.keys(responses).length / form.fields.length) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Login Requirement Notice */}
-          {form.settings?.requireLogin && !user && !showLoginRequired && (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-sm">
-              <div className="flex items-center space-x-2 text-yellow-800">
-                <AlertCircle className="w-5 h-5" />
-                <span className="font-medium">Sign in required</span>
-              </div>
-              <p className="text-sm text-yellow-700 mt-1">
-                You must be signed in to submit this form.
-              </p>
-              <div className="mt-3 flex space-x-2">
-                <button
-                  onClick={() => {
-                    localStorage.setItem('returnUrl', window.location.pathname);
-                    window.location.href = '/login';
-                  }}
-                  className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.setItem('returnUrl', window.location.pathname);
-                    window.location.href = '/register';
-                  }}
-                  className="px-3 py-1 border border-yellow-600 text-yellow-800 rounded text-sm hover:bg-yellow-100"
-                >
-                  Sign Up
-                </button>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-            {form.fields.map((field) => (
-              <div key={field.id}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {field.label}
-                  {field.required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                {renderField(field)}
-              </div>
-            ))}
-
-            <button
-              type="submit"
-              disabled={submitting || (form.settings?.requireLogin && !user)}
-              className="w-full flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Submit
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-      </div>
 
       <ResponseSavePrompt
         isOpen={showSavePrompt}

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // const API_BASE_URL = 'https://oorb-forms.onrender.com/api';
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5001/api';
 // const API_BASE_URL = '/api';
 
 const api = axios.create({
@@ -131,6 +131,13 @@ export const formAPI = {
   publishForm: (id: string) => {
     console.log('Form API: Publishing form:', id);
     return api.post(`/forms/${id}/publish`);
+  },
+
+  uploadImage: (formData: FormData) => {
+    console.log('Form API: Uploading image to Cloudinary');
+    return api.post('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
   },
 
   getAnalytics: (id: string) => {

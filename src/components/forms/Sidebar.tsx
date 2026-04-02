@@ -27,6 +27,7 @@ interface SidebarProps {
   currentView: string;
   onNavigate: (view: string) => void;
   onToggle?: (minimized: boolean) => void;
+  disableMinimize?: boolean;
 }
 
 const NAV_ITEMS = [
@@ -41,6 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onNavigate,
   onToggle,
+  disableMinimize = false,
 }) => {
   const { user, logout, getInitials } = useAuth();
   const [recentForms, setRecentForms] = useState<RecentForm[]>([]);
@@ -49,6 +51,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => { loadRecentForms(); }, []);
   useEffect(() => { if (onToggle) onToggle(isMinimized); }, [isMinimized, onToggle]);
+
+  const effectiveMinimized = disableMinimize ? false : isMinimized;
 
   const loadRecentForms = async () => {
     try {
@@ -65,21 +69,23 @@ const Sidebar: React.FC<SidebarProps> = ({
     <aside
       className="h-screen flex flex-col transition-all duration-300 select-none"
       style={{
-        width: isMinimized ? 70 : 240,
+        width: effectiveMinimized ? 70 : 240,
         background: '#ffffff',
         borderRight: '1px solid #e2e8f0',
       }}
     >
       {/* Logo */}
       <div className="h-[60px] flex items-center px-4 border-b border-slate-100 flex-shrink-0">
-        {isMinimized ? (
+        {effectiveMinimized ? (
           <div className="flex flex-col items-center w-full gap-1.5">
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm shadow-indigo-200">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <button onClick={() => setIsMinimized(false)} className="p-1 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors">
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            {!disableMinimize && (
+              <button onClick={() => setIsMinimized(false)} className="p-1 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors">
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-between w-full">
@@ -89,9 +95,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <span className="font-bold text-[15px] tracking-tight text-slate-900">OORB Forms</span>
             </div>
-            <button onClick={() => setIsMinimized(true)} className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+            {!disableMinimize && (
+              <button onClick={() => setIsMinimized(true)} className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -100,11 +108,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="px-3 pt-3 pb-2 flex-shrink-0">
         <button
           onClick={onCreateForm}
-          title={isMinimized ? 'New Form' : undefined}
-          className={`w-full flex items-center ${isMinimized ? 'justify-center' : 'gap-2'} py-2 px-3 bg-indigo-600 text-white text-[13px] font-semibold rounded-xl shadow-sm shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.97] transition-all duration-150`}
+          title={effectiveMinimized ? 'New Form' : undefined}
+          className={`w-full flex items-center ${effectiveMinimized ? 'justify-center' : 'gap-2'} py-2 px-3 bg-indigo-600 text-white text-[13px] font-semibold rounded-xl shadow-sm shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.97] transition-all duration-150`}
         >
           <Plus className="w-4 h-4 flex-shrink-0" />
-          {!isMinimized && 'New Form'}
+          {!effectiveMinimized && 'New Form'}
         </button>
       </div>
 
@@ -119,8 +127,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={view}
               onClick={() => onNavigate(view)}
-              title={isMinimized ? label : undefined}
-              className={`w-full flex items-center ${isMinimized ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 relative ${active
+              title={effectiveMinimized ? label : undefined}
+              className={`w-full flex items-center ${effectiveMinimized ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 relative ${active
                   ? 'text-indigo-700'
                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                 }`}
@@ -131,14 +139,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] bg-indigo-600 rounded-r-full" />
               )}
               <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
-              {!isMinimized && label}
+              {!effectiveMinimized && label}
             </button>
           );
         })}
       </nav>
 
       {/* Recent Forms — only when expanded */}
-      {!isMinimized && (
+      {!effectiveMinimized && (
         <div className="flex-1 overflow-y-auto px-2 py-3 mt-1" style={{ scrollbarWidth: 'none' }}>
           <button
             onClick={() => setIsRecentExpanded(p => !p)}
@@ -167,11 +175,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
-      {isMinimized && <div className="flex-1" />}
+      {effectiveMinimized && <div className="flex-1" />}
 
       {/* User */}
       <div className="border-t border-slate-100 px-3 py-3 flex-shrink-0">
-        <div className={`flex items-center ${isMinimized ? 'justify-center' : 'gap-2.5'}`}>
+        <div className={`flex items-center ${effectiveMinimized ? 'justify-center' : 'gap-2.5'}`}>
           {user.avatar ? (
             <img src={user.avatar} className="w-7 h-7 rounded-full ring-2 ring-white shadow-sm flex-shrink-0 object-cover" alt="" />
           ) : (
@@ -179,7 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               {getInitials()}
             </div>
           )}
-          {!isMinimized && (
+          {!effectiveMinimized && (
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-[12px] font-semibold text-slate-800 truncate leading-tight">{user.name}</p>

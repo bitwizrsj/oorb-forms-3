@@ -8,6 +8,7 @@ import exportRoutes from './routes/exports.js';
 import folderRoutes from './routes/folders.js';
 import authRoutes from './routes/auth.js';
 import integrationRoutes from './routes/integrations.js';
+import uploadRoutes from './routes/upload.js';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ const PORT = process.env.PORT || 5000;
 // ✅ CORS: fixed origins + any extra origins from CORS_ORIGINS env var (comma-separated)
 const BASE_ORIGINS = [
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'https://oorb-forms.vercel.app',
   'https://forms.oorbtech.com',
   'https://nb0fzghw-5173.inc1.devtunnels.ms',
@@ -52,6 +54,7 @@ app.use('/api/exports', exportRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/integrations', integrationRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

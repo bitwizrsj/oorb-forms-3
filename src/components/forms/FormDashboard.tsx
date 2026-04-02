@@ -288,7 +288,7 @@ const FormDashboard: React.FC<FormDashboardProps> = ({ onCreateForm, onEditForm,
         {/* ── Create New ──────────────────────────── */}
         <section>
           <SectionLabel className="mb-3">Create New</SectionLabel>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { icon: <img src={ai3d} alt="" className="w-8 h-8 object-contain" />, title: 'AI Builder', desc: 'Describe it, AI builds it', badge: 'Fastest', onClick: () => navigate('/ai-chat'), accent: 'hover:border-indigo-300' },
               { icon: <img src={temp3d} alt="" className="w-8 h-8 object-contain" />, title: 'Templates', desc: 'Pre-built, ready to go', onClick: () => setShowTemplates(true), accent: 'hover:border-emerald-300' },

@@ -38,6 +38,7 @@ const fieldSchema = new mongoose.Schema({
 const formSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: String,
+  headerImage: String,
   fields: [fieldSchema],
   folderId: {
     type: mongoose.Schema.Types.ObjectId,

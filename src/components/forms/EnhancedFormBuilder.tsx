@@ -92,6 +92,7 @@ interface Form {
   title: string;
   description: string;
   fields: FormField[];
+  headerImage?: string;
   status: 'draft' | 'published' | 'closed';
   shareUrl?: string;
   conditionalRules?: any[];
@@ -99,6 +100,7 @@ interface Form {
     allowMultipleResponses?: boolean;
     requireLogin?: boolean;
     showProgressBar?: boolean;
+    headerImage?: string;
     customTheme?: {
       primaryColor: string;
       backgroundColor: string;
@@ -151,6 +153,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
     allowMultipleResponses: true,
     requireLogin: true,
     showProgressBar: true,
+    headerImage: '',
     customTheme: {
       primaryColor: '#3B82F6',
       backgroundColor: '#FFFFFF'
@@ -204,6 +207,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
         showProgressBar: form.settings.showProgressBar !== undefined
           ? form.settings.showProgressBar
           : true,
+        headerImage: form.settings.headerImage || form.headerImage || '',
         customTheme: form.settings.customTheme || {
           primaryColor: '#3B82F6',
           backgroundColor: '#FFFFFF'
@@ -456,7 +460,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
     return (
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`bg-white border-l border-gray-200 p-6 w-80 shadow-2xl fixed right-0 top-0 h-full z-50 md:relative md:z-0 flex-shrink-0 overflow-y-auto ${mobileFieldEditorOpen ? 'block' : 'hidden md:block'
+        className={`bg-white border-l border-gray-200 p-6 w-[min(20rem,100vw)] shadow-2xl fixed right-0 top-0 h-full z-50 md:relative md:z-0 flex-shrink-0 overflow-y-auto ${mobileFieldEditorOpen ? 'block' : 'hidden md:block'
           }`}>
         <div className="flex justify-between items-center mb-4 md:hidden">
           <h3 className="text-lg font-semibold">Field Settings</h3>
@@ -594,7 +598,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
   const renderDesignTab = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-4">Theme Customization</h3>
+        <h3 className="text-lg font-semibold mb-4">Color Palette</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -675,44 +679,62 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
 
   if (previewMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold">Form Preview</h1>
+      <div className="min-h-screen bg-[#F0F4F8] pb-12">
+        <div className="bg-white border-b border-slate-200 px-6 py-3 sticky top-0 z-50">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                <Eye size={16} className="text-white" />
+              </div>
+              <span className="text-sm font-bold text-slate-900">Preview Mode</span>
+            </div>
             <button
               onClick={() => setPreviewMode(false)}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-sm hover:from-blue-700 hover:to-purple-700 shadow-lg transition-all"
+              className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-[0.98]"
             >
               Back to Editor
             </button>
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto p-6">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-8">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{form.title}</h1>
-              <p className="text-gray-600">{form.description}</p>
-            </div>
+        <div className="mt-8">
+          <div className="max-w-3xl mx-auto px-4">
+             <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
+                {form.headerImage && (
+                  <div className="w-full aspect-[4.5/1] max-h-[240px] overflow-hidden relative">
+                    <img src={form.headerImage} alt="Header" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                  </div>
+                )}
+                
+                <div className="p-8 sm:p-12">
+                  <div className="mb-10 pb-10 border-b border-slate-50">
+                    <h1 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">{form.title}</h1>
+                    <p className="text-lg text-slate-500 font-medium leading-relaxed">{form.description}</p>
+                  </div>
 
-            <form className="space-y-6">
-              {form.fields.map((field) => (
-                <div key={field.id}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {field.label}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
-                  </label>
-                  {renderFieldPreview(field)}
+                  <form className="space-y-10" onSubmit={(e) => e.preventDefault()}>
+                    {form.fields.map((field) => (
+                      <div key={field.id}>
+                        <label className="block text-[15px] font-bold text-slate-800 mb-4">
+                          {field.label}
+                          {field.required && <span className="text-rose-500 ml-1.5">*</span>}
+                        </label>
+                        {renderFieldPreview(field)}
+                      </div>
+                    ))}
+
+                    <div className="pt-8">
+                      <button
+                        type="button"
+                        className="w-full px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-[0.98]"
+                      >
+                        Submit Response
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              ))}
-
-              <button
-                type="submit"
-                className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-sm hover:from-blue-700 hover:to-purple-700 shadow-lg transition-all"
-              >
-                Submit
-              </button>
-            </form>
+             </div>
           </div>
         </div>
       </div>
@@ -791,9 +813,9 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
         </div>
 
         {/* Row 2: Menu bar (File / Insert / View) + Tabs */}
-        <div ref={menuRef} className="flex items-center gap-0.5 px-4 border-b border-slate-100">
+        <div ref={menuRef} className="flex items-center gap-0.5 px-4 border-b border-slate-100 min-w-0">
           {/* File menu */}
-          <div className="relative">
+          <div className="relative hidden sm:block">
             <button onClick={() => setOpenMenu(p => p === 'file' ? null : 'file')}
               className={`flex items-center px-3 py-2 text-[13px] rounded-lg transition-colors ${openMenu === 'file' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100'}`}>File</button>
             {openMenu === 'file' && (
@@ -822,7 +844,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
           </div>
 
           {/* Insert menu */}
-          <div className="relative">
+          <div className="relative hidden sm:block">
             <button onClick={() => setOpenMenu(p => p === 'insert' ? null : 'insert')}
               className={`flex items-center px-3 py-2 text-[13px] rounded-lg transition-colors ${openMenu === 'insert' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100'}`}>Insert</button>
             {openMenu === 'insert' && (
@@ -841,7 +863,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
           </div>
 
           {/* View menu */}
-          <div className="relative">
+          <div className="relative hidden sm:block">
             <button onClick={() => setOpenMenu(p => p === 'view' ? null : 'view')}
               className={`flex items-center px-3 py-2 text-[13px] rounded-lg transition-colors ${openMenu === 'view' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100'}`}>View</button>
             {openMenu === 'view' && (
@@ -859,24 +881,34 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
           </div>
 
           {/* Divider then tabs */}
-          <div className="h-4 w-px bg-slate-200 mx-1" />
+          <div className="hidden sm:block h-4 w-px bg-slate-200 mx-1" />
 
-          {/* Tabs inline */}
-          {[
-            { id: 'fields', label: 'Fields', icon: Type },
-            { id: 'logic', label: 'Logic', icon: GitBranch },
-            { id: 'design', label: 'Design', icon: Palette },
-            { id: 'settings', label: 'Settings', icon: Settings },
-          ].map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}>
-                <Icon size={13} /><span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {/* Tabs (scrollable on mobile) */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {[
+                { id: 'fields', label: 'Fields', icon: Type },
+                { id: 'logic', label: 'Logic', icon: GitBranch },
+                { id: 'design', label: 'Design', icon: Palette },
+                { id: 'settings', label: 'Settings', icon: Settings },
+              ].map(tab => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium border-b-2 transition-colors shrink-0 ${activeTab === tab.id
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                  >
+                    <Icon size={13} />
+                    <span className="whitespace-nowrap">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Back link */}
           <button onClick={onBack} className="ml-auto flex items-center gap-1.5 px-3 py-2 text-[12px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
@@ -889,15 +921,21 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
       <div className="flex flex-1 min-h-0">
 
         {/* ── LEFT SIDEBAR ── */}
-        <aside className={`${mobileSidebarOpen ? 'fixed inset-0 z-30' : 'hidden'
-          } md:relative md:flex w-56 bg-white border-r border-slate-200 flex-col overflow-y-auto flex-shrink-0`}>
-          {/* Mobile close */}
-          <div className="flex justify-end p-3 md:hidden">
-            <button onClick={() => setMobileSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={16} /></button>
-          </div>
+        {mobileSidebarOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <div
+              className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            <aside className="relative z-10 h-full w-72 max-w-[85vw] bg-white border-r border-slate-200 flex flex-col overflow-y-auto shadow-2xl">
+              {/* Mobile close */}
+              <div className="flex items-center justify-between p-3 border-b border-slate-100">
+                <p className="text-[12px] font-bold text-slate-700">Add fields</p>
+                <button onClick={() => setMobileSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><X size={16} /></button>
+              </div>
 
-          {/* Quick Start */}
-          <div className="px-4 pt-4 pb-3">
+              {/* Quick Start */}
+              <div className="px-4 pt-4 pb-3">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quick Start</p>
             <div className="space-y-1">
               <button onClick={() => { setShowAIBuilder(true); setMobileSidebarOpen(false); }}
@@ -906,6 +944,54 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
                 <span className="text-[13px] text-slate-600 group-hover:text-slate-900">AI Form Builder</span>
               </button>
               <button onClick={() => { setShowTemplates(true); setMobileSidebarOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition-colors group text-left">
+                <FileText size={14} className="text-blue-500 flex-shrink-0" />
+                <span className="text-[13px] text-slate-600 group-hover:text-slate-900">Use Template</span>
+              </button>
+            </div>
+              </div>
+
+              <div className="h-px bg-slate-100 mx-4" />
+
+              {/* Field sections */}
+              <div className="px-4 pt-4 pb-5 flex-1">
+            {([
+              { group: 'Basic', types: ['text', 'email', 'phone', 'textarea'] },
+              { group: 'Choice', types: ['select', 'radio', 'checkbox'] },
+              { group: 'Other', types: ['date', 'file', 'rating', 'question'] },
+            ] as const).map(({ group, types }) => (
+              <div key={group} className="mb-4">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{group}</p>
+                <div className="space-y-0.5">
+                  {fieldTypes.filter(f => (types as readonly string[]).includes(f.type)).map(ft => {
+                    const Icon = ft.icon;
+                    return (
+                      <button key={ft.type} onClick={() => { addField(ft.type as FormField['type']); setMobileSidebarOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-xl transition-colors group">
+                        <Icon size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                        <span className="text-[13px] text-slate-600 group-hover:text-slate-900">{ft.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+              </div>
+            </aside>
+          </div>
+        )}
+
+        <aside className="hidden md:flex w-56 bg-white border-r border-slate-200 flex-col overflow-y-auto flex-shrink-0">
+          {/* Quick Start */}
+          <div className="px-4 pt-4 pb-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quick Start</p>
+            <div className="space-y-1">
+              <button onClick={() => setShowAIBuilder(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-indigo-50 transition-colors group text-left">
+                <Sparkles size={14} className="text-indigo-500 flex-shrink-0" />
+                <span className="text-[13px] text-slate-600 group-hover:text-slate-900">AI Form Builder</span>
+              </button>
+              <button onClick={() => setShowTemplates(true)}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition-colors group text-left">
                 <FileText size={14} className="text-blue-500 flex-shrink-0" />
                 <span className="text-[13px] text-slate-600 group-hover:text-slate-900">Use Template</span>
@@ -928,7 +1014,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
                   {fieldTypes.filter(f => (types as readonly string[]).includes(f.type)).map(ft => {
                     const Icon = ft.icon;
                     return (
-                      <button key={ft.type} onClick={() => { addField(ft.type as FormField['type']); setMobileSidebarOpen(false); }}
+                      <button key={ft.type} onClick={() => addField(ft.type as FormField['type'])}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 rounded-xl transition-colors group">
                         <Icon size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
                         <span className="text-[13px] text-slate-600 group-hover:text-slate-900">{ft.label}</span>
@@ -950,9 +1036,73 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
                   <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 to-violet-500" />
                   <div className="p-6 md:p-8">
                     <div className="mb-6 md:mb-8">
+                      {/* Header Image Upload Section */}
+                      <div className="mb-6 bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                             <Palette size={12} className="text-indigo-500" />
+                             Header Image
+                          </label>
+                          {form.headerImage && (
+                            <button 
+                              onClick={() => setForm(p => ({ ...p, headerImage: '' }))}
+                              className="text-[10px] font-bold text-rose-500 hover:text-rose-600"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      <div className="p-4">
+                           <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                              <input 
+                                type="text" 
+                                placeholder="Image URL..."
+                                value={form.headerImage || ''}
+                                onChange={e => setForm(p => ({ ...p, headerImage: e.target.value }))}
+                                className="flex-1 px-3 py-1.5 text-[12px] bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/20"
+                              />
+                              <input
+                                type="file"
+                                id="header-upload-main"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const formData = new FormData();
+                                    formData.append('image', file);
+                                    toast.promise(
+                                      formAPI.uploadImage(formData),
+                                      {
+                                        loading: 'Uploading...',
+                                        success: (res) => {
+                                          setForm(p => ({ ...p, headerImage: res.data.url }));
+                                          return 'Header uploaded!';
+                                        },
+                                        error: 'Upload failed'
+                                      }
+                                    );
+                                  }
+                                }}
+                              />
+                              <label 
+                                htmlFor="header-upload-main"
+                                className="px-3 py-2 sm:py-1.5 bg-indigo-600 text-white text-[11px] font-bold rounded-lg cursor-pointer hover:bg-indigo-700 text-center"
+                              >
+                                Upload
+                              </label>
+                           </div>
+                           {form.headerImage && (
+                             <div className="aspect-[4.5/1] rounded-lg overflow-hidden border border-slate-200">
+                               <img src={form.headerImage} alt="Header" className="w-full h-full object-cover" />
+                             </div>
+                           )}
+                        </div>
+                      </div>
+
                       <input type="text" value={form.title} onClick={e => e.stopPropagation()}
                         onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setSavedCloud(false); }}
-                        className="text-2xl font-black text-slate-900 bg-transparent border-none outline-none focus:bg-slate-50 rounded-lg px-2 py-1 w-full"
+                      className="text-xl sm:text-2xl font-black text-slate-900 bg-transparent border-none outline-none focus:bg-slate-50 rounded-lg px-2 py-1 w-full"
                         placeholder="Form Title" />
                       <textarea value={form.description} onClick={e => e.stopPropagation()}
                         onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setSavedCloud(false); }}
