@@ -20,7 +20,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<boolean>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (profileData: any) => Promise<boolean>;
@@ -98,10 +98,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string, rememberMe = false): Promise<boolean> => {
     try {
       console.log('Auth Context: Attempting login for:', email);
-      const response = await authAPI.login({ email, password });
+      const response = await authAPI.login({ email, password, rememberMe });
       const { token, user: userData } = response.data;
 
       console.log('Auth Context: Login response received:', {

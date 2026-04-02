@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FileText, Eye, EyeOff, Sparkles, BarChart3,
-  Share2, Layers, CheckCircle, ArrowRight, Zap
+  Share2, Layers, CheckCircle, ArrowRight, Zap, X, Mail, KeyRound
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { authAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 
 /* ── keep scrollbar hidden ── */
 const scrollbarCSS = `
@@ -78,7 +80,13 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Forgot password state
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
 
@@ -127,7 +135,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const success = await login(email, password);
+      const success = await login(email, password, rememberMe);
       if (success) {
         const returnUrl = localStorage.getItem('returnUrl');
         if (returnUrl) {
@@ -144,6 +152,20 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotLoading(true);
+    try {
+      await authAPI.forgotPassword(forgotEmail.trim());
+      setForgotSent(true);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to send reset email');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   if (user) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d0d14' }}>
@@ -156,7 +178,8 @@ const LoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <>
+      <div className="min-h-screen flex" style={{ fontFamily: "'Inter', -apple-system, sans-serif" }}>
 
       {/* ── LEFT PANEL — Same theme as AIChatInterface ── */}
       <div
@@ -291,10 +314,16 @@ const LoginPage: React.FC = () => {
 
             {/* Password */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</label>
-                <a href="#" className="text-xs text-indigo-600 font-semibold hover:text-indigo-700">Forgot password?</a>
-              </div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgot(true); setForgotSent(false); setForgotEmail(''); }}
+                    className="text-xs text-indigo-600 font-semibold hover:text-indigo-700"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               <div className="relative">
                 <input
                   id="password"
@@ -314,9 +343,17 @@ const LoginPage: React.FC = () => {
             </div>
 
             {/* Remember me */}
-            <div className="flex items-center gap-2">
-              <input id="remember-me" type="checkbox" className="w-4 h-4 rounded accent-indigo-600" />
-              <label htmlFor="remember-me" className="text-sm text-slate-500">Remember me for 30 days</label>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded accent-indigo-600"
+                />
+                <span className="text-sm text-slate-500">Remember me for 30 days</span>
+              </label>
             </div>
 
             {/* Submit */}
@@ -366,18 +403,77 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Trust badges */}
-          <div className="flex flex-col gap-2 mt-7">
-            {['Free forever — no credit card required', 'Your data is encrypted end-to-end'].map(t => (
-              <div key={t} className="flex items-center gap-2">
-                <CheckCircle size={13} className="text-emerald-500 flex-shrink-0" />
-                <span className="text-xs text-slate-400">{t}</span>
-              </div>
-            ))}
           </div>
         </div>
       </div>
-    </div>
+
+      {/* ── Forgot Password modal ── */}
+      {showForgot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <KeyRound size={15} className="text-indigo-600" />
+                </div>
+                <span className="font-bold text-slate-900 text-sm">Forgot your password?</span>
+              </div>
+              <button onClick={() => setShowForgot(false)} className="text-slate-400 hover:text-slate-700 transition-colors p-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {forgotSent ? (
+                <div className="text-center py-4">
+                  <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Mail size={26} className="text-emerald-500" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 mb-1">Check your inbox</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">
+                    If an account exists for <strong>{forgotEmail}</strong>, a password reset link has been sent. It expires in <strong>15 minutes</strong>.
+                  </p>
+                  <button
+                    onClick={() => setShowForgot(false)}
+                    className="mt-5 w-full py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotSubmit} className="flex flex-col gap-4">
+                  <p className="text-sm text-slate-500 leading-relaxed">
+                    Enter your account email and we'll send you a password reset link.
+                  </p>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email address</label>
+                    <input
+                      type="email"
+                      required
+                      autoFocus
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      placeholder="you@company.com"
+                      className="w-full px-3.5 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl outline-none transition-all placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:bg-white"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-60 active:scale-[0.98] transition-all"
+                    style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+                  >
+                    {forgotLoading
+                      ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />Sending…</>
+                      : <>Send Reset Link <ArrowRight size={14} /></>}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

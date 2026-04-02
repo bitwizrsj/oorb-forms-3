@@ -1,16 +1,23 @@
 import express from 'express';
 import Response from '../models/Response.js';
 import Form from '../models/Form.js';
+import User from '../models/User.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { createTransport } from 'nodemailer';
 import multer from 'multer';
 import fs from 'fs';
 import cloudinary from '../services/cloudinary.js';
+import { appendResponseToSheet } from '../services/sheetsService.js';
 
 const router = express.Router();
 
-// Use memory storage — we'll manually stream to Cloudinary so we can set resource_type: 'auto'
-const upload = multer({ storage: multer.memoryStorage() });
+// Use memory storage with 5MB limit — we'll manually stream to Cloudinary 
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
 
 const logDebug = (msg) => {
   if (!fs.existsSync('upload-debug.log')) {
@@ -22,12 +29,12 @@ const logDebug = (msg) => {
 
 // Email transporter setup
 const transporter = createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.EMAIL_PORT || '587'),
   secure: false,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    pass: process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS
   }
 });
 
@@ -81,6 +88,34 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Form is not published' });
     }
 
+    // ── Expiry date check ───────────────────────────────────────────────────
+    if (form.settings?.expiryDate && new Date() > new Date(form.settings.expiryDate)) {
+      return res.status(400).json({ error: 'This form has expired and is no longer accepting responses.' });
+    }
+
+    // ── Domain restriction check ────────────────────────────────────────────
+    const allowedDomains = form.settings?.allowedEmailDomains || [];
+    if (allowedDomains.length > 0) {
+      let submitterEmail = submitterInfo?.email || null;
+      if (userId) {
+        const submitterUser = await User.findById(userId).select('email');
+        if (submitterUser) submitterEmail = submitterUser.email;
+      }
+      
+      if (submitterEmail) {
+        const emailDomain = submitterEmail.split('@')[1]?.toLowerCase();
+        const domainAllowed = allowedDomains.some(d => d.toLowerCase() === emailDomain);
+        if (!domainAllowed) {
+          return res.status(403).json({
+            error: `Access denied. This form is only accessible to ${allowedDomains.map(d => '@' + d).join(', ')} email addresses.`
+          });
+        }
+      } else if (form.settings?.requireLogin) {
+          // If login is required but no email found (shouldn't happen with proper frontend), deny
+          return res.status(401).json({ error: 'Authentication required to verify email domain.' });
+      }
+    }
+
     // Create response
     const response = new Response({
       formId,
@@ -101,21 +136,70 @@ router.post('/', async (req, res) => {
     form.completionRate = form.views > 0 ? (form.responses / form.views) * 100 : 0;
     await form.save();
 
-    // Send email notification (if configured)
-    if (process.env.EMAIL_USER) {
+    // ── Email notification to form creator ─────────────────────────────────
+    if (form.settings?.emailNotifications !== false && process.env.EMAIL_USER) {
       try {
-        const emailContent = responses.map(r =>
-          `${r.fieldLabel}: ${Array.isArray(r.value) ? r.value.join(', ') : r.value}`
-        ).join('\n');
+        // Fetch form creator to get their email
+        const creator = await User.findById(form.createdBy).select('email name');
+        const recipientEmail = form.settings?.notificationEmail || creator?.email;
 
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: process.env.EMAIL_USER, // Send to admin
-          subject: `New Response: ${form.title}`,
-          text: `New form response received:\n\n${emailContent}\n\nSubmitted at: ${new Date().toLocaleString()}`
-        });
+        if (recipientEmail) {
+          const emailContent = responses
+            .map(r => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;color:#374151;width:40%">${r.fieldLabel}</td><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#6B7280">${Array.isArray(r.value) ? r.value.join(', ') : r.value || '—'}</td></tr>`)
+            .join('');
+
+          await transporter.sendMail({
+            from: `"OORB Forms" <${process.env.EMAIL_USER}>`,
+            to: recipientEmail,
+            subject: `📋 New Response: ${form.title}`,
+            html: `
+              <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff">
+                <div style="background:#4F46E5;padding:24px 32px;border-radius:12px 12px 0 0">
+                  <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700">New Form Response</h1>
+                  <p style="color:#C7D2FE;margin:4px 0 0;font-size:14px">${form.title}</p>
+                </div>
+                <div style="padding:24px 32px">
+                  <p style="color:#6B7280;font-size:14px;margin:0 0 20px">A new response was submitted on ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST.</p>
+                  <table style="width:100%;border-collapse:collapse;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden">
+                    <thead><tr><th style="padding:10px 12px;background:#F9FAFB;text-align:left;font-size:12px;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em">Field</th><th style="padding:10px 12px;background:#F9FAFB;text-align:left;font-size:12px;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em">Response</th></tr></thead>
+                    <tbody>${emailContent}</tbody>
+                  </table>
+                  <div style="margin-top:24px;padding:16px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px">
+                    <p style="margin:0;font-size:13px;color:#0369A1">View all responses in your <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="color:#0284C7;font-weight:600">OORB Forms dashboard</a>.</p>
+                  </div>
+                </div>
+                <div style="padding:16px 32px;background:#F9FAFB;border-top:1px solid #E5E7EB;border-radius:0 0 12px 12px">
+                  <p style="margin:0;font-size:12px;color:#9CA3AF">Powered by OORB Forms · <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="color:#6B7280">Unsubscribe</a></p>
+                </div>
+              </div>
+            `
+          });
+          console.log(`📧 Email notification sent to ${recipientEmail} for form: ${form.title}`);
+        }
       } catch (emailError) {
-        console.error('Email notification failed:', emailError);
+        console.error('Email notification failed:', emailError.message);
+      }
+    }
+
+    // ── Google Sheets integration ───────────────────────────────────────────
+    if (
+      form.settings?.googleSheets?.enabled &&
+      form.settings?.googleSheets?.spreadsheetId
+    ) {
+      try {
+        const creator = await User.findById(form.createdBy).select('googleRefreshToken');
+        if (creator?.googleRefreshToken) {
+          await appendResponseToSheet(
+            creator.googleRefreshToken,
+            form.settings.googleSheets.spreadsheetId,
+            form.settings.googleSheets.sheetName || 'Responses',
+            form.fields,
+            responses,
+            new Date().toISOString()
+          );
+        }
+      } catch (sheetsError) {
+        console.error('Google Sheets sync failed:', sheetsError.message);
       }
     }
 
@@ -243,8 +327,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 // Get user's own responses (forms they've submitted to)
 router.get('/my-responses', authenticateToken, async (req, res) => {
   try {
-    console.log('My responses route - Getting responses for user:', req.user._id);
+    console.log('MY_RESPONSES_DEBUG: Starting fetch for user:', req.user._id);
 
+    // 1. Find responses
     const responses = await Response.find({
       'submitterInfo.userId': req.user._id,
       'submitterInfo.savedToAccount': true
@@ -252,20 +337,50 @@ router.get('/my-responses', authenticateToken, async (req, res) => {
       .populate('formId', 'title description')
       .sort({ submittedAt: -1 });
 
-    const formattedResponses = responses.map(response => ({
-      _id: response._id,
-      formId: response.formId._id,
-      formTitle: response.formId.title,
-      responses: response.responses,
-      submittedAt: response.submittedAt,
-      completionTime: response.completionTime
-    }));
+    console.log(`MY_RESPONSES_DEBUG: Found ${responses.length} responses in DB`);
 
-    console.log('My responses route - Found', formattedResponses.length, 'responses');
+    // 2. Filter and Map with extreme caution
+    const formattedResponses = responses
+      .filter(r => {
+        if (!r.formId) {
+          console.log(`MY_RESPONSES_DEBUG: Skipping response ${r._id} - formId is null (likely deleted form)`);
+          return false;
+        }
+        return true;
+      })
+      .map(response => {
+        try {
+          // Mongoose populate might return the ID if population fails, 
+          // or the object if it succeeds.
+          const form = response.formId;
+          const formIdStr = form._id ? form._id.toString() : form.toString();
+          const formTitleStr = form.title || 'Untitled Form';
+
+          return {
+            _id: response._id,
+            formId: formIdStr,
+            formTitle: formTitleStr,
+            responses: response.responses || [],
+            submittedAt: response.submittedAt,
+            completionTime: response.completionTime
+          };
+        } catch (mapError) {
+          console.error('MY_RESPONSES_DEBUG: Error mapping individual response:', response._id, mapError);
+          return null;
+        }
+      })
+      .filter(Boolean); // Remove any that failed mapping
+
+    console.log(`MY_RESPONSES_DEBUG: Returning ${formattedResponses.length} formatted responses`);
     res.json(formattedResponses);
   } catch (error) {
-    console.error('My responses route - Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('MY_RESPONSES_DEBUG: FATAL ERROR in my-responses route:');
+    console.error(error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch your responses', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

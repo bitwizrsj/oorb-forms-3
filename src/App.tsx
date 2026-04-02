@@ -9,6 +9,7 @@ import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import EnhancedOorbFormsApp from './components/forms/EnhancedOorbFormsApp';
 import AIChatInterface from './components/chat/AIChatInterface';
+import ResetPasswordPage from './components/auth/ResetPasswordPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -69,6 +70,11 @@ const AppRoutes: React.FC = () => {
         <Route path="/register" element={
           <PublicRoute>
             <RegisterPage />
+          </PublicRoute>
+        } />
+        <Route path="/reset-password" element={
+          <PublicRoute>
+            <ResetPasswordPage />
           </PublicRoute>
         } />
         <Route path="/form/:shareUrl" element={<FormRenderer />} />

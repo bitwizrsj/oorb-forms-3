@@ -37,6 +37,7 @@ interface Form {
     allowMultipleResponses?: boolean;
     showProgressBar?: boolean;
     headerImage?: string;
+    allowedEmailDomains?: string[];
   };
   views?: number;
   responses?: number;
@@ -52,11 +53,13 @@ const FormRenderer: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isClosed, setIsClosed] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [startTime] = useState(Date.now());
   const [user, setUser] = useState<any>(null);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [domainDenied, setDomainDenied] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is logged in
@@ -76,20 +79,55 @@ const FormRenderer: React.FC = () => {
   }, [shareUrl]);
 
   useEffect(() => {
-    // Check if login is required when form loads
+    // Check login + domain restriction when form and user load
     if (form && form.settings?.requireLogin && !user) {
       setShowLoginRequired(true);
     } else {
       setShowLoginRequired(false);
     }
+
+    // Domain restriction: check if user's email domain is allowed
+    if (form && user) {
+      const allowedDomains = form.settings?.allowedEmailDomains || [];
+      if (allowedDomains.length > 0) {
+        const userDomain = user.email?.split('@')[1]?.toLowerCase();
+        const allowed = allowedDomains.some((d: string) => d.toLowerCase() === userDomain);
+        if (!allowed) {
+          setDomainDenied(allowedDomains.map((d: string) => '@' + d).join(', '));
+        } else {
+          setDomainDenied(null);
+        }
+      } else {
+        setDomainDenied(null);
+      }
+    }
   }, [form, user]);
   const loadForm = async () => {
     try {
       const response = await formAPI.getFormByShareUrl(shareUrl!);
-      setForm(response.data);
+      const formData = response.data;
+      setForm(formData);
+
+      // --- View Throttling ---
+      // Only increment view count once per session
+      const sessionKey = `viewed_${formData._id}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        formAPI.incrementView(shareUrl!).catch(err => console.error('Error incrementing view:', err));
+        sessionStorage.setItem(sessionKey, 'true');
+      }
+
+      // Check if closed
+      if (formData.status === 'closed') {
+        setIsClosed(true);
+      }
+
+      // --- Expiry check ---
+      if (formData.settings?.expiryDate && new Date() > new Date(formData.settings.expiryDate)) {
+        setIsClosed(true);
+      }
 
       // Calculate estimated time (rough estimate: 30 seconds per field)
-      const estimatedTime = Math.ceil(response.data.fields.length * 0.5);
+      const estimatedTime = Math.ceil(formData.fields.length * 0.5);
       setForm(prev => prev ? { ...prev, estimatedTime } : null);
     } catch (error) {
       toast.error('Form not found');
@@ -478,6 +516,72 @@ const FormRenderer: React.FC = () => {
     );
   }
 
+  // Domain restriction screen — shown when user is logged in but wrong domain
+  if (isClosed) {
+    return (
+      <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+          <div className="h-2 bg-slate-400" />
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 text-slate-400" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 mb-2">Form Closed</h1>
+            <p className="text-slate-500 text-sm leading-relaxed mb-6">
+              This form is no longer accepting responses. Please contact the form creator if you believe this is an error.
+            </p>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="px-6 py-2.5 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-all"
+            >
+              Go Back Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (domainDenied) {
+    return (
+      <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+          <div className="h-2 bg-red-500" />
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h1>
+            <p className="text-slate-500 text-sm leading-relaxed mb-4">
+              This form is only accessible to users with the following email domains:
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center mb-6">
+              {domainDenied.split(', ').map(d => (
+                <span key={d} className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm font-bold rounded-full">
+                  {d}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400">
+              You are signed in as <span className="font-semibold text-slate-600">{user?.email}</span>. Please sign in with an authorized account.
+            </p>
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.setItem('returnUrl', window.location.pathname);
+                window.location.href = '/login';
+              }}
+              className="mt-5 px-6 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-all"
+            >
+              Sign in with a different account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (submitted) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -511,7 +615,7 @@ const FormRenderer: React.FC = () => {
       <div className="min-h-screen bg-[#F0F4F8] pb-12">
       <FormHeader form={form} />
 
-      <div className="max-w-4xl mx-auto px-4 relative z-10">
+      <div className="max-w-3xl mx-auto px-4 relative z-10">
         <div className="bg-white rounded-b-[24px] shadow-sm border-x border-b border-slate-100 overflow-hidden -mt-1">
           {/* Progress Bar */}
           {form.settings?.showProgressBar && form.fields.length > 0 && (
@@ -535,7 +639,19 @@ const FormRenderer: React.FC = () => {
                   </span>
                 </div>
               </div>
-              {!user && (
+              {user ? (
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    localStorage.setItem('returnUrl', window.location.pathname);
+                    window.location.href = '/login';
+                  }}
+                  className="px-4 py-1.5 bg-white border border-slate-200 text-indigo-600 text-[10px] sm:text-xs font-bold rounded-full hover:bg-indigo-50 hover:border-indigo-200 transition-all active:scale-[0.95] shadow-sm uppercase tracking-tight"
+                >
+                  Switch account
+                </button>
+              ) : (
                 <button
                   onClick={() => {
                     localStorage.setItem('returnUrl', window.location.pathname);

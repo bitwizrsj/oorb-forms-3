@@ -6,11 +6,13 @@ import FormDashboard from './FormDashboard';
 import ResponseViewer from './ResponseViewer';
 import FormCreationModal from './FormCreationModal';
 import Sidebar from './Sidebar';
+import UserResponses from './UserResponses';
+import UserSettings from '../auth/UserSettings';
 import { formAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import EnhancedFormBuilder from './EnhancedFormBuilder';
 
-type View = 'dashboard' | 'builder' | 'responses' | 'settings';
+type View = 'dashboard' | 'builder' | 'responses' | 'settings' | 'my-responses';
 
 const EnhancedOorbFormsApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -102,6 +104,7 @@ const EnhancedOorbFormsApp: React.FC = () => {
     );
   }
 
+  // Analytics view (specific to a form)
   if (currentView === 'responses') {
     return currentFormId ? (
       <>
@@ -170,7 +173,8 @@ const EnhancedOorbFormsApp: React.FC = () => {
                 <Menu className="w-5 h-5" />
               </button>
               <span className="font-bold text-slate-900 text-[15px]">
-                {currentView === 'dashboard' ? 'Dashboard' : 'Settings'}
+                {currentView === 'dashboard' ? 'Dashboard' : 
+                 currentView === 'my-responses' ? 'Your Responses' : 'Settings'}
               </span>
               <button
                 onClick={handleCreateForm}
@@ -182,11 +186,17 @@ const EnhancedOorbFormsApp: React.FC = () => {
             </div>
           )}
 
-          <FormDashboard
-            onCreateForm={handleCreateForm}
-            onEditForm={handleEditForm}
-            onViewResponses={handleViewResponses}
-          />
+          {currentView === 'dashboard' ? (
+            <FormDashboard
+              onCreateForm={handleCreateForm}
+              onEditForm={handleEditForm}
+              onViewResponses={handleViewResponses}
+            />
+          ) : currentView === 'my-responses' ? (
+            <UserResponses />
+          ) : (
+            <UserSettings />
+          )}
         </div>
 
         {/* ── MOBILE BOTTOM NAV ────────────────────────────────── */}
@@ -194,7 +204,7 @@ const EnhancedOorbFormsApp: React.FC = () => {
           <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 flex items-center justify-around px-2 py-1 safe-area-inset-bottom shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
             {[
               { view: 'dashboard', icon: LayoutDashboard, label: 'Home' },
-              { view: 'responses', icon: BarChart3, label: 'Analytics' },
+              { view: 'my-responses', icon: BarChart3, label: 'History' },
               { view: 'settings', icon: Settings, label: 'Settings' },
             ].map(({ view, icon: Icon, label }) => {
               const active = currentView === view;

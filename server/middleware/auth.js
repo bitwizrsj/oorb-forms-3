@@ -1,7 +1,11 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-here';
+if (!process.env.JWT_SECRET) {
+  console.error('\x1b[31m%s\x1b[0m', 'FATAL ERROR: JWT_SECRET is not defined in environment variables.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const authenticateToken = async (req, res, next) => {
   try {

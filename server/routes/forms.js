@@ -59,22 +59,25 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // Get form by share URL (public - no authentication needed)
 router.get('/share/:shareUrl', async (req, res) => {
   try {
-    console.log('Forms route - Getting form by share URL:', req.params.shareUrl);
-    
     const form = await Form.findOne({ shareUrl: req.params.shareUrl });
-    if (!form) {
-      console.log('Forms route - Form not found for share URL');
-      return res.status(404).json({ error: 'Form not found' });
-    }
-    
-    // Increment view count
-    form.views += 1;
-    await form.save();
-    
-    console.log('Forms route - Public form found:', form.title);
+    if (!form) return res.status(404).json({ error: 'Form not found' });
     res.json(form);
   } catch (error) {
-    console.error('Forms route - Error getting form by share URL:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Increment view count (public)
+router.post('/share/:shareUrl/view', async (req, res) => {
+  try {
+    const form = await Form.findOneAndUpdate(
+      { shareUrl: req.params.shareUrl },
+      { $inc: { views: 1 } },
+      { new: true }
+    );
+    if (!form) return res.status(404).json({ error: 'Form not found' });
+    res.json({ views: form.views });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

@@ -70,7 +70,7 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: (credentials: { email: string; password: string }) => {
+  login: (credentials: { email: string; password: string; rememberMe?: boolean }) => {
     console.log('Auth API: Attempting login for:', credentials.email);
     return api.post('/auth/login', credentials);
   },
@@ -94,6 +94,21 @@ export const authAPI = {
     console.log('Auth API: Updating profile');
     return api.put('/auth/profile', profileData);
   },
+  
+  changePassword: (passwordData: any) => {
+    console.log('Auth API: Changing password');
+    return api.put('/auth/change-password', passwordData);
+  },
+
+  forgotPassword: (email: string) => {
+    console.log('Auth API: Forgot password for:', email);
+    return api.post('/auth/forgot-password', { email });
+  },
+
+  resetPassword: (token: string, password: string) => {
+    console.log('Auth API: Resetting password');
+    return api.post('/auth/reset-password', { token, password });
+  },
 };
 
 // Form API
@@ -111,6 +126,11 @@ export const formAPI = {
   getFormByShareUrl: (shareUrl: string) => {
     console.log('Form API: Getting form by share URL:', shareUrl);
     return api.get(`/forms/share/${shareUrl}`);
+  },
+
+  incrementView: (shareUrl: string) => {
+    console.log('Form API: Incrementing view for share URL:', shareUrl);
+    return api.post(`/forms/share/${shareUrl}/view`);
   },
 
   createForm: (formData: any) => {
@@ -264,7 +284,17 @@ export const integrationsAPI = {
   disconnectGoogle: () => {
     console.log('Integrations API: Disconnecting Google Drive');
     return api.post('/integrations/google/disconnect');
-  }
+  },
+
+  linkGoogleSheets: (data: { formId: string; spreadsheetId: string; sheetName?: string; enabled?: boolean }) => {
+    console.log('Integrations API: Linking Google Sheets');
+    return api.post('/integrations/google-sheets/link', data);
+  },
+
+  createGoogleSheet: (data: { formId: string; title?: string }) => {
+    console.log('Integrations API: Creating Google Sheet');
+    return api.post('/integrations/google-sheets/create', data);
+  },
 };
 
 export default api;

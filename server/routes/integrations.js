@@ -1,7 +1,9 @@
 import express from 'express';
 import { google } from 'googleapis';
 import User from '../models/User.js';
+import Form from '../models/Form.js';
 import { authenticateToken as auth } from '../middleware/auth.js';
+import { createSpreadsheet } from '../services/sheetsService.js';
 
 const router = express.Router();
 
@@ -20,11 +22,11 @@ router.get('/google/auth', auth, (req, res) => {
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: [
-        'https://www.googleapis.com/auth/drive'
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/spreadsheets'
       ],
-      // We need to know who the user is when they come back, so we pass their ID in state
       state: req.user._id.toString(),
-      prompt: 'consent' // Forces Google to resend refresh token
+      prompt: 'consent'
     });
     res.json({ url });
   } catch (error) {
@@ -84,6 +86,64 @@ router.post('/google/disconnect', auth, async (req, res) => {
   } catch (error) {
     console.error('Error disconnecting Google Drive:', error);
     res.status(500).json({ error: 'Failed to disconnect' });
+  }
+});
+
+// ── Google Sheets: Link spreadsheet to a form ──────────────────────────────
+// POST /api/integrations/google-sheets/link
+// Body: { formId, spreadsheetId, sheetName, enabled }
+router.post('/google-sheets/link', auth, async (req, res) => {
+  try {
+    const { formId, spreadsheetId, sheetName = 'Responses', enabled = true } = req.body;
+    if (!formId) return res.status(400).json({ error: 'formId is required' });
+
+    const form = await Form.findOne({ _id: formId, createdBy: req.user._id });
+    if (!form) return res.status(404).json({ error: 'Form not found or access denied' });
+
+    form.settings = form.settings || {};
+    form.settings.googleSheets = { spreadsheetId, sheetName, enabled };
+    await form.save();
+
+    res.json({ success: true, googleSheets: form.settings.googleSheets });
+  } catch (error) {
+    console.error('Error linking Google Sheets:', error);
+    res.status(500).json({ error: 'Failed to link Google Sheets' });
+  }
+});
+
+// ── Google Sheets: Create new spreadsheet for a form ──────────────────────
+// POST /api/integrations/google-sheets/create
+// Body: { formId, title }
+router.post('/google-sheets/create', auth, async (req, res) => {
+  try {
+    const { formId, title } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user?.googleRefreshToken) {
+      return res.status(400).json({ error: 'Google account not connected. Please connect Google Drive first.' });
+    }
+
+    const form = await Form.findOne({ _id: formId, createdBy: req.user._id });
+    if (!form) return res.status(404).json({ error: 'Form not found' });
+
+    const sheet = await createSpreadsheet(
+      user.googleRefreshToken,
+      title || `${form.title} – Responses`
+    );
+
+    // Auto-link the new sheet to the form
+    form.settings = form.settings || {};
+    form.settings.googleSheets = {
+      spreadsheetId: sheet.spreadsheetId,
+      sheetName: sheet.sheetName,
+      enabled: true
+    };
+    await form.save();
+
+    res.json({ success: true, ...sheet });
+  } catch (error) {
+    console.error('Error creating Google Sheet:', error);
+    res.status(500).json({ error: 'Failed to create Google Sheet: ' + error.message });
   }
 });
 

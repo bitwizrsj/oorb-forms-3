@@ -17,6 +17,7 @@ import AdvancedValidation from './AdvancedValidation';
 import FormAnalytics from './FormAnalytics';
 import QuestionAnswerField from './QuestionAnswerField';
 import FormEditorAIAssistant from './FormEditorAIAssistant';
+import FieldEditor from './FieldEditor';
 
 /* ── Save-As Modal ─────────────────────────────────── */
 const SaveAsModal: React.FC<{
@@ -105,6 +106,7 @@ interface Form {
       primaryColor: string;
       backgroundColor: string;
     };
+    expiryDate?: string | Date | null;
   };
   theme?: {
     primaryColor: string;
@@ -154,11 +156,16 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
     requireLogin: true,
     showProgressBar: true,
     headerImage: '',
+    emailNotifications: true,
+    notificationEmail: '',
+    allowedEmailDomains: [] as string[],
     customTheme: {
       primaryColor: '#3B82F6',
       backgroundColor: '#FFFFFF'
-    }
+    },
+    expiryDate: null as string | null
   });
+  const [domainInput, setDomainInput] = useState('');
 
   const fieldTypes = [
     { type: 'text', label: 'Text Input', icon: Type },
@@ -194,27 +201,33 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  // Update form settings when form changes
   useEffect(() => {
     if (form.settings) {
-      setFormSettings({
-        allowMultipleResponses: form.settings.allowMultipleResponses !== undefined
-          ? form.settings.allowMultipleResponses
+      setFormSettings(prev => ({
+        ...prev,
+        allowMultipleResponses: form.settings!.allowMultipleResponses !== undefined
+          ? form.settings!.allowMultipleResponses
           : true,
-        requireLogin: form.settings.requireLogin !== undefined
-          ? form.settings.requireLogin
+        requireLogin: form.settings!.requireLogin !== undefined
+          ? form.settings!.requireLogin
           : true,
-        showProgressBar: form.settings.showProgressBar !== undefined
-          ? form.settings.showProgressBar
+        showProgressBar: form.settings!.showProgressBar !== undefined
+          ? form.settings!.showProgressBar
           : true,
-        headerImage: form.settings.headerImage || form.headerImage || '',
-        customTheme: form.settings.customTheme || {
+        headerImage: (form.settings as any)?.headerImage || form.headerImage || '',
+        emailNotifications: (form.settings as any)?.emailNotifications !== undefined
+          ? (form.settings as any).emailNotifications
+          : true,
+        notificationEmail: (form.settings as any)?.notificationEmail || '',
+        allowedEmailDomains: (form.settings as any)?.allowedEmailDomains || [],
+        customTheme: form.settings!.customTheme || {
           primaryColor: '#3B82F6',
           backgroundColor: '#FFFFFF'
-        }
-      });
+        },
+        expiryDate: form.settings!.expiryDate || null
+      }));
     }
-  }, [form]);
+  }, [form._id]);
 
   const loadForm = async () => {
     try {
@@ -451,148 +464,6 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
       default:
         return null;
     }
-  };
-
-  const renderFieldEditor = () => {
-    const field = form.fields.find(f => f.id === selectedField);
-    if (!field) return null;
-
-    return (
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className={`bg-white border-l border-gray-200 p-6 w-[min(20rem,100vw)] shadow-2xl fixed right-0 top-0 h-full z-50 md:relative md:z-0 flex-shrink-0 overflow-y-auto ${mobileFieldEditorOpen ? 'block' : 'hidden md:block'
-          }`}>
-        <div className="flex justify-between items-center mb-4 md:hidden">
-          <h3 className="text-lg font-semibold">Field Settings</h3>
-          <button
-            onClick={() => setMobileFieldEditorOpen(false)}
-            className="p-2 text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Field Label
-            </label>
-            <input
-              type="text"
-              value={field.label}
-              onChange={(e) => updateField(field.id, { label: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {['text', 'email', 'phone', 'textarea'].includes(field.type) && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Placeholder
-              </label>
-              <input
-                type="text"
-                value={field.placeholder || ''}
-                onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          )}
-
-          {field.type === 'file' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Google Drive Folder ID (Optional)
-              </label>
-              <input
-                type="text"
-                value={field.googleDriveFolderId || ''}
-                onChange={(e) => updateField(field.id, { googleDriveFolderId: e.target.value })}
-                placeholder="e.g. 1B2c3D4e5F6g..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Leave empty for default. (Requires Google Drive Integration)
-              </p>
-            </div>
-          )}
-
-          {['radio', 'checkbox', 'select'].includes(field.type) && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Options
-              </label>
-              <div className="space-y-2">
-                {field.options?.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...(field.options || [])];
-                        newOptions[index] = e.target.value;
-                        updateField(field.id, { options: newOptions });
-                      }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={() => {
-                        const newOptions = field.options?.filter((_, i) => i !== index);
-                        updateField(field.id, { options: newOptions });
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-sm"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => {
-                    const newOptions = [...(field.options || []), `Option ${(field.options?.length || 0) + 1}`];
-                    updateField(field.id, { options: newOptions });
-                  }}
-                  className="w-full px-3 py-2 border border-dashed border-gray-300 rounded-sm text-gray-600 hover:bg-gray-50"
-                >
-                  + Add Option
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="required"
-              checked={field.required}
-              onChange={(e) => updateField(field.id, { required: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <label htmlFor="required" className="text-sm font-medium text-gray-700">
-              Required field
-            </label>
-          </div>
-
-          <AdvancedValidation
-            field={field}
-            onValidationChange={(validation) => updateField(field.id, { validation })}
-          />
-
-          {field.type === 'question' && (
-            <QuestionAnswerField
-              field={field}
-              onFieldUpdate={(updates) => updateField(field.id, updates)}
-            />
-          )}
-
-          <button
-            onClick={() => deleteField(field.id)}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-sm hover:bg-red-700 transition-colors shadow-lg"
-          >
-            Delete Field
-          </button>
-        </div>
-      </div>
-    );
   };
 
   const renderDesignTab = () => (
@@ -1189,11 +1060,38 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
             )}
 
             {activeTab === 'settings' && (
-              <div className="max-w-2xl mx-auto">
-                <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 md:p-8">
-                  <h3 className="text-lg font-semibold mb-4">Form Settings</h3>
+              <div className="max-w-2xl mx-auto space-y-4">
+
+                {/* ── Access Control ───────────────────────── */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-base font-bold text-slate-900 mb-1">Access Control & Expiry</h3>
+                  <p className="text-xs text-slate-400 mb-5">Control who can view and submit this form and when</p>
+
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-2">
+                    {/* Allow without login toggle — inverted logic */}
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        id="allowAnonymous"
+                        checked={!formSettings.requireLogin}
+                        onChange={(e) => setFormSettings(prev => ({
+                          ...prev,
+                          requireLogin: !e.target.checked
+                        }))}
+                        className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <label htmlFor="allowAnonymous" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Allow filling without sign-in
+                        </label>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          By default, users must sign in. Check this to allow anonymous submissions.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Multiple responses */}
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
                       <input
                         type="checkbox"
                         id="allowMultiple"
@@ -1202,30 +1100,134 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
                           ...prev,
                           allowMultipleResponses: e.target.checked
                         }))}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <label htmlFor="allowMultiple" className="text-sm font-medium text-gray-700">
-                        Allow multiple responses from same user
-                      </label>
+                      <div>
+                        <label htmlFor="allowMultiple" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Allow multiple submissions
+                        </label>
+                        <p className="text-xs text-slate-400 mt-0.5">Let the same user submit more than once</p>
+                      </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="requireLogin"
-                        checked={formSettings.requireLogin}
-                        onChange={(e) => setFormSettings(prev => ({
-                          ...prev,
-                          requireLogin: e.target.checked
-                        }))}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor="requireLogin" className="text-sm font-medium text-gray-700">
-                        Require login to submit
-                      </label>
+                    {/* Domain restriction — like Google Forms */}
+                    <div className="p-4 rounded-xl border border-slate-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-slate-800">Restrict to specific email domains</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-3">
+                        Only users with these email domains can submit. Leave empty to allow all. (e.g. <code className="bg-slate-100 px-1 rounded text-slate-600">poornima.edu.in</code>)
+                      </p>
+
+                      {/* Domain chips */}
+                      {(formSettings.allowedEmailDomains || []).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {(formSettings.allowedEmailDomains || []).map((domain: string) => (
+                            <span
+                              key={domain}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold rounded-full"
+                            >
+                              @{domain}
+                              <button
+                                type="button"
+                                onClick={() => setFormSettings(prev => ({
+                                  ...prev,
+                                  allowedEmailDomains: (prev.allowedEmailDomains || []).filter((d: string) => d !== domain)
+                                }))}
+                                className="text-indigo-400 hover:text-indigo-700 transition-colors"
+                              >
+                                <AlertCircle className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add domain input */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={domainInput}
+                          onChange={(e) => setDomainInput(e.target.value.toLowerCase().replace(/^@/, '').replace(/\s/g, ''))}
+                          onKeyDown={(e) => {
+                            if ((e.key === 'Enter' || e.key === ',') && domainInput.trim()) {
+                              e.preventDefault();
+                              const d = domainInput.trim().replace(/^@/, '');
+                              if (d && !(formSettings.allowedEmailDomains || []).includes(d)) {
+                                setFormSettings(prev => ({
+                                  ...prev,
+                                  allowedEmailDomains: [...(prev.allowedEmailDomains || []), d]
+                                }));
+                              }
+                              setDomainInput('');
+                            }
+                          }}
+                          placeholder="Type domain and press Enter (e.g. poornima.edu.in)"
+                          className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = domainInput.trim().replace(/^@/, '');
+                            if (d && !(formSettings.allowedEmailDomains || []).includes(d)) {
+                              setFormSettings(prev => ({
+                                ...prev,
+                                allowedEmailDomains: [...(prev.allowedEmailDomains || []), d]
+                              }));
+                            }
+                            setDomainInput('');
+                          }}
+                          className="px-3 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    {/* Expiry Date */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar size={14} className="text-indigo-500" />
+                        <span className="text-sm font-semibold text-slate-800">Form Expiry Date</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-3">
+                        Set a date and time after which the form will automatically close. Leave empty for no limit.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="datetime-local"
+                          value={formSettings.expiryDate ? new Date(new Date(formSettings.expiryDate).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''}
+                          onChange={(e) => setFormSettings(prev => ({
+                            ...prev,
+                            expiryDate: e.target.value || null
+                          }))}
+                          className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        {formSettings.expiryDate && (
+                          <button
+                            type="button"
+                            onClick={() => setFormSettings(prev => ({ ...prev, expiryDate: null }))}
+                            className="px-3 py-2 text-xs font-bold text-rose-500 hover:text-rose-600 transition-colors"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      {formSettings.expiryDate && new Date(formSettings.expiryDate) < new Date() && (
+                        <p className="mt-2 text-[11px] font-bold text-rose-500 flex items-center gap-1">
+                          <AlertCircle size={12} /> This date is in the past. The form will be closed immediately upon saving.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── General Settings ─────────────────────── */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-base font-bold text-slate-900 mb-1">General</h3>
+                  <p className="text-xs text-slate-400 mb-5">Control form appearance and behaviour</p>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
                       <input
                         type="checkbox"
                         id="showProgress"
@@ -1234,87 +1236,72 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
                           ...prev,
                           showProgressBar: e.target.checked
                         }))}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <label htmlFor="showProgress" className="text-sm font-medium text-gray-700">
-                        Show progress bar
-                      </label>
-                    </div>
-
-                    {formSettings.requireLogin && (
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
-                        <div className="flex items-center space-x-2 text-blue-800">
-                          <AlertCircle className="w-5 h-5" />
-                          <span className="font-medium">Login Required</span>
-                        </div>
-                        <p className="text-sm text-blue-700 mt-1">
-                          Users must be signed in to submit responses to this form.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="border-t border-gray-200 pt-4">
-                      <h4 className="text-md font-medium text-gray-900 mb-3">Notification Settings</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="emailNotifications"
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <label htmlFor="emailNotifications" className="text-sm font-medium text-gray-700">
-                            Email notifications for new responses
-                          </label>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="responseLimit"
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <label htmlFor="responseLimit" className="text-sm font-medium text-gray-700">
-                            Limit number of responses
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-gray-200 pt-4">
-                      <h4 className="text-md font-medium text-gray-900 mb-3">Form Behavior</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="shuffleQuestions"
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <label htmlFor="shuffleQuestions" className="text-sm font-medium text-gray-700">
-                            Randomize question order
-                          </label>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="confirmationPage"
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <label htmlFor="confirmationPage" className="text-sm font-medium text-gray-700">
-                            Show confirmation page after submission
-                          </label>
-                        </div>
+                      <div>
+                        <label htmlFor="showProgress" className="text-sm font-semibold text-slate-800 cursor-pointer">Show progress bar</label>
+                        <p className="text-xs text-slate-400 mt-0.5">Display a progress indicator as users fill in the form</p>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* ── Notifications ────────────────────────── */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-base font-bold text-slate-900 mb-1">Email Notifications</h3>
+                  <p className="text-xs text-slate-400 mb-5">Get notified when someone submits your form</p>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        id="emailNotifications"
+                        checked={(formSettings as any).emailNotifications !== false}
+                        onChange={(e) => setFormSettings(prev => ({
+                          ...prev,
+                          emailNotifications: e.target.checked
+                        } as any))}
+                        className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="emailNotifications" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Notify me on each response
+                        </label>
+                        <p className="text-xs text-slate-400 mt-0.5">A formatted email will be sent to your account email</p>
+                        {(formSettings as any).emailNotifications !== false && (
+                          <div className="mt-3">
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Custom recipient email (optional)</label>
+                            <input
+                              type="email"
+                              value={(formSettings as any).notificationEmail || ''}
+                              onChange={(e) => setFormSettings(prev => ({
+                                ...prev,
+                                notificationEmail: e.target.value
+                              } as any))}
+                              placeholder="Leave blank to use your account email"
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
         </main>
 
         {/* Field Editor side panel */}
-        {activeTab === 'fields' && renderFieldEditor()}
+        {activeTab === 'fields' && (
+          <FieldEditor
+            field={form.fields.find(f => f.id === selectedField)}
+            updateField={updateField}
+            deleteField={deleteField}
+            mobileFieldEditorOpen={mobileFieldEditorOpen}
+            setMobileFieldEditorOpen={setMobileFieldEditorOpen}
+          />
+        )}
       </div>
 
       {/* Save As Modal */}
@@ -1352,7 +1339,17 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
       {showIntegrations && form._id && (
         <IntegrationsPanel
           formId={form._id}
+          formTitle={form.title}
+          formSettings={{
+            googleSheets: (formSettings as any).googleSheets,
+            emailNotifications: (formSettings as any).emailNotifications,
+            notificationEmail: (formSettings as any).notificationEmail,
+          }}
           onClose={() => setShowIntegrations(false)}
+          onSettingsChange={(updated) => {
+            setFormSettings(prev => ({ ...prev, ...updated }));
+            setSavedCloud(false);
+          }}
         />
       )}
 

@@ -35,7 +35,7 @@ const FormHeader: React.FC<FormHeaderProps> = ({ form, showStats = false }) => {
 
   return (
     <div className="bg-[#F0F4F8] pt-4 sm:pt-8">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-3xl mx-auto px-4">
         <div className="bg-white rounded-t-[24px] shadow-sm border-x border-t border-slate-100 overflow-hidden">
           {form.headerImage && (
             <div className="w-full aspect-[4.5/1] max-h-[320px] overflow-hidden relative">
@@ -84,7 +84,7 @@ const FormHeader: React.FC<FormHeaderProps> = ({ form, showStats = false }) => {
 
             {/* Title and Description */}
             <div className="mb-10">
-              <h1 className="text-2xl sm:text-4xl font-black text-slate-900 mb-4 sm:mb-6 tracking-tight leading-[1.1]">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mb-4 sm:mb-6 tracking-tight leading-[1.1]">
                 {form.title}
               </h1>
               {form.description && (

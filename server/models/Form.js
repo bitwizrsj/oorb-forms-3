@@ -47,16 +47,24 @@ const formSchema = new mongoose.Schema({
   },
   settings: {
     allowMultipleResponses: { type: Boolean, default: true },
-    requireLogin: { type: Boolean, default: false },
+    requireLogin: { type: Boolean, default: true },
     showProgressBar: { type: Boolean, default: true },
-    emailNotifications: { type: Boolean, default: false },
+    emailNotifications: { type: Boolean, default: true },
+    notificationEmail: { type: String, default: null },
     responseLimit: { type: Number, default: null },
     shuffleQuestions: { type: Boolean, default: false },
     confirmationPage: { type: Boolean, default: true },
+    allowedEmailDomains: { type: [String], default: [] },
+    googleSheets: {
+      spreadsheetId: { type: String, default: null },
+      sheetName: { type: String, default: 'Responses' },
+      enabled: { type: Boolean, default: false }
+    },
     customTheme: {
       primaryColor: { type: String, default: '#3B82F6' },
       backgroundColor: { type: String, default: '#FFFFFF' }
-    }
+    },
+    expiryDate: { type: Date, default: null }
   },
   status: {
     type: String,

@@ -32,7 +32,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { view: 'responses', label: 'Responses', icon: BarChart3 },
+  { view: 'my-responses', label: 'Your Responses', icon: BarChart3 },
   { view: 'settings', label: 'Settings', icon: Settings },
 ];
 
