@@ -3,7 +3,7 @@ import { google } from 'googleapis';
 import User from '../models/User.js';
 import Form from '../models/Form.js';
 import { authenticateToken as auth } from '../middleware/auth.js';
-import { createSpreadsheet } from '../services/sheetsService.js';
+import { createSpreadsheet, extractSpreadsheetId } from '../services/sheetsService.js';
 
 const router = express.Router();
 
@@ -100,8 +100,10 @@ router.post('/google-sheets/link', auth, async (req, res) => {
     const form = await Form.findOne({ _id: formId, createdBy: req.user._id });
     if (!form) return res.status(404).json({ error: 'Form not found or access denied' });
 
+    const cleanSpreadsheetId = extractSpreadsheetId(spreadsheetId);
+
     form.settings = form.settings || {};
-    form.settings.googleSheets = { spreadsheetId, sheetName, enabled };
+    form.settings.googleSheets = { spreadsheetId: cleanSpreadsheetId, sheetName, enabled };
     await form.save();
 
     res.json({ success: true, googleSheets: form.settings.googleSheets });

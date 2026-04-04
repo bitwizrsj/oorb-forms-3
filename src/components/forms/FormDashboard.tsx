@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, Search, BarChart3, ExternalLink, FileText, Folder, FolderOpen,
   FolderPlus, Settings, LogOut, MoreVertical, User,
-  CheckCircle2, AlertCircle, Edit, Trash2, Copy,
+  CheckCircle2, AlertCircle, Edit, Trash2, Copy, Users
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,6 +29,12 @@ interface FormItem {
   status: 'published' | 'draft' | 'closed';
   shareUrl?: string;
   folderId?: string;
+  collaborators?: string[];
+  createdBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
 }
 interface FolderItem {
   _id: string;
@@ -70,6 +76,15 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${pub ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
       {pub ? <CheckCircle2 className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
       {status}
+    </span>
+  );
+};
+
+const CollabBadge: React.FC = () => {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-100/50">
+      <Users className="w-2.5 h-2.5" />
+      Collaborator
     </span>
   );
 };
@@ -430,7 +445,10 @@ const FormDashboard: React.FC<FormDashboardProps> = ({ onCreateForm, onEditForm,
                           <FileText className={`w-4 h-4 ${pub ? 'text-emerald-600' : 'text-slate-400'}`} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[14px] font-semibold text-slate-900 truncate">{form.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[14px] font-semibold text-slate-900 truncate">{form.title}</p>
+                            {form.createdBy && user && form.createdBy._id !== user._id && <CollabBadge />}
+                          </div>
                           {form.description && <p className="text-[11px] text-slate-400 truncate hidden sm:block">{form.description}</p>}
                         </div>
                       </div>

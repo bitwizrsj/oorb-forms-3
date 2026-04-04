@@ -10,6 +10,7 @@ import RegisterPage from './components/auth/RegisterPage';
 import EnhancedOorbFormsApp from './components/forms/EnhancedOorbFormsApp';
 import AIChatInterface from './components/chat/AIChatInterface';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
+import AcceptInvitation from './components/forms/AcceptInvitation';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -50,6 +51,12 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   if (user) {
+    const returnUrl = localStorage.getItem('returnUrl');
+    if (returnUrl) {
+      console.log('User authenticated, redirecting to returnUrl:', returnUrl);
+      localStorage.removeItem('returnUrl');
+      return <Navigate to={returnUrl} replace />;
+    }
     console.log('User already authenticated, redirecting to AI Chat');
     return <Navigate to="/ai-chat" replace />;
   }
@@ -78,6 +85,11 @@ const AppRoutes: React.FC = () => {
           </PublicRoute>
         } />
         <Route path="/form/:shareUrl" element={<FormRenderer />} />
+        <Route path="/collab/accept/:token" element={
+          <ProtectedRoute>
+            <AcceptInvitation />
+          </ProtectedRoute>
+        } />
 
         <Route path="/oorb-forms" element={
           <ProtectedRoute>

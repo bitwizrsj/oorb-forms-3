@@ -4,7 +4,7 @@ import {
   Type, CheckSquare, Circle, Calendar, Mail, Phone, FileText, Upload, Star,
   Plus, Trash2, Settings, Eye, Save, Share2, ArrowLeft, Send, Sparkles,
   Palette, Code, Zap, BarChart3, GitBranch, Menu, X, AlertCircle, HelpCircle,
-  Cloud, CloudOff, GripVertical, Check, Folder, FolderOpen,
+  Cloud, CloudOff, GripVertical, Check, Folder, FolderOpen, Users
 } from 'lucide-react';
 import { formAPI, folderAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -18,6 +18,7 @@ import FormAnalytics from './FormAnalytics';
 import QuestionAnswerField from './QuestionAnswerField';
 import FormEditorAIAssistant from './FormEditorAIAssistant';
 import FieldEditor from './FieldEditor';
+import CollaboratorsModal from './CollaboratorsModal';
 
 /* ── Save-As Modal ─────────────────────────────────── */
 const SaveAsModal: React.FC<{
@@ -142,6 +143,7 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
   const [showTemplates, setShowTemplates] = useState(false);
   const [showEmbedCode, setShowEmbedCode] = useState(false);
   const [showIntegrations, setShowIntegrations] = useState(false);
+  const [showCollabModal, setShowCollabModal] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'logic' | 'design' | 'settings'>('fields');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -661,6 +663,12 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
               className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
               <Eye size={13} /><span className="hidden sm:inline">Preview</span>
             </button>
+            {form._id && (
+              <button onClick={() => setShowCollabModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-indigo-600 border border-indigo-100 bg-indigo-50/50 rounded-xl hover:bg-indigo-100 transition-all">
+                <Users size={13} /><span className="hidden sm:inline">Collaborators</span>
+              </button>
+            )}
             <button onClick={() => saveForm()} disabled={saving}
               className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50">
               <Save size={13} /><span className="hidden sm:inline">Save</span>
@@ -1396,6 +1404,13 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
       </div>
       {/* Form Editor AI Assistant */}
       <FormEditorAIAssistant currentForm={form} onUpdateForm={setForm} />
+      
+      <CollaboratorsModal 
+        isOpen={showCollabModal} 
+        onClose={() => setShowCollabModal(false)} 
+        formId={form._id || ''} 
+        formTitle={form.title} 
+      />
     </div>
   );
 };

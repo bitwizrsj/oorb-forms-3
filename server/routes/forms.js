@@ -11,8 +11,12 @@ router.get('/', authenticateToken, async (req, res) => {
     console.log('Forms route - Getting forms for user:', req.user._id);
     
     const { limit, sort } = req.query;
-    let query = Form.find({ createdBy: req.user._id });
-    
+    let query = Form.find({ 
+      $or: [
+        { createdBy: req.user._id },
+        { collaborators: req.user._id }
+      ]
+    });
     if (sort) {
       query = query.sort({ [sort]: -1 });
     } else {
@@ -40,7 +44,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
     
     const form = await Form.findOne({ 
       _id: req.params.id, 
-      createdBy: req.user._id 
+      $or: [
+        { createdBy: req.user._id },
+        { collaborators: req.user._id }
+      ]
     }).populate('createdBy', 'name email');
     
     if (!form) {
@@ -111,7 +118,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
     console.log('Forms route - Updating form:', req.params.id, 'for user:', req.user._id);
     
     const form = await Form.findOneAndUpdate(
-      { _id: req.params.id, createdBy: req.user._id },
+      { 
+        _id: req.params.id, 
+        $or: [
+          { createdBy: req.user._id },
+          { collaborators: req.user._id }
+        ] 
+      },
       { ...req.body, updatedAt: new Date() },
       { new: true, runValidators: true }
     ).populate('createdBy', 'name email');
@@ -161,7 +174,13 @@ router.post('/:id/publish', authenticateToken, async (req, res) => {
     console.log('Forms route - Publishing form:', req.params.id, 'for user:', req.user._id);
     
     const form = await Form.findOneAndUpdate(
-      { _id: req.params.id, createdBy: req.user._id },
+      { 
+        _id: req.params.id, 
+        $or: [
+          { createdBy: req.user._id },
+          { collaborators: req.user._id }
+        ] 
+      },
       { status: 'published', updatedAt: new Date() },
       { new: true }
     ).populate('createdBy', 'name email');
@@ -186,7 +205,10 @@ router.get('/:id/analytics', authenticateToken, async (req, res) => {
     
     const form = await Form.findOne({ 
       _id: req.params.id, 
-      createdBy: req.user._id 
+      $or: [
+        { createdBy: req.user._id },
+        { collaborators: req.user._id }
+      ]
     });
     
     if (!form) {

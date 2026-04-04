@@ -1,18 +1,20 @@
 import { google } from 'googleapis';
 
 /**
+ * Extracts the spreadsheet ID from a string, handles both raw IDs and full URLs.
+ */
+export function extractSpreadsheetId(idOrUrl) {
+  if (!idOrUrl) return idOrUrl;
+  const match = idOrUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : idOrUrl.trim();
+}
+
+/**
  * Append a form response as a new row in a Google Sheet.
- *
- * @param {string} refreshToken  - The form owner's Google OAuth refresh token
- * @param {string} spreadsheetId - Target spreadsheet ID
- * @param {string} sheetName     - Target sheet/tab name (default: 'Responses')
- * @param {Array}  formFields    - Array of form field objects { label }
- * @param {Array}  responseData  - Array of response objects { fieldLabel, value }
- * @param {string} submittedAt   - ISO timestamp
  */
 export async function appendResponseToSheet(
   refreshToken,
-  spreadsheetId,
+  spreadsheetIdInput,
   sheetName = 'Responses',
   formFields,
   responseData,
@@ -27,17 +29,37 @@ export async function appendResponseToSheet(
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 
   const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+  const spreadsheetId = extractSpreadsheetId(spreadsheetIdInput);
 
-  // ── 1. Check if header row exists ──────────────────────────────────────────
+  // ── 1. Resolve Sheet Name ──────────────────────────────────────────────────
+  let targetSheetName = sheetName;
+  
+  try {
+    // Attempt to verify if the specified sheet exists, if not, find the first available one
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetExists = spreadsheet.data.sheets.some(s => s.properties.title === targetSheetName);
+    
+    if (!sheetExists && spreadsheet.data.sheets.length > 0) {
+      // Use the first sheet title as a fallback
+      targetSheetName = spreadsheet.data.sheets[0].properties.title;
+      console.log(`⚠️ Specified sheet "${sheetName}" not found. Falling back to "${targetSheetName}"`);
+    }
+  } catch (err) {
+    console.error('❌ Error fetching spreadsheet metadata:', err.message);
+    // If we can't even get metadata, the spreadsheet might be inaccessible
+    throw new Error('Spreadsheet not found or access denied. Please check permissions.');
+  }
+
+  // ── 2. Check if header row exists ──────────────────────────────────────────
   let existingValues = [];
   try {
     const headerRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!1:1`,
+      range: `${targetSheetName}!1:1`,
     });
     existingValues = headerRes.data.values ? headerRes.data.values[0] : [];
   } catch (_) {
-    // Sheet might not have any data yet — that's fine
+    // Sheet might not have any data yet
   }
 
   // Build header from form field labels + Submitted At
@@ -47,13 +69,13 @@ export async function appendResponseToSheet(
   if (!existingValues || existingValues.length === 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A1`,
+      range: `${targetSheetName}!A1`,
       valueInputOption: 'RAW',
       requestBody: { values: [headerRow] },
     });
   }
 
-  // ── 2. Build data row matching header order ─────────────────────────────────
+  // ── 3. Build data row matching header order ─────────────────────────────────
   const dataRow = formFields.map(field => {
     const found = responseData.find(r => r.fieldLabel === field.label || r.fieldId === field.id);
     if (!found) return '';
@@ -61,16 +83,16 @@ export async function appendResponseToSheet(
   });
   dataRow.push(submittedAt || new Date().toISOString());
 
-  // ── 3. Append row ───────────────────────────────────────────────────────────
+  // ── 4. Append row ───────────────────────────────────────────────────────────
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${sheetName}!A1`,
+    range: `${targetSheetName}!A1`,
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
     requestBody: { values: [dataRow] },
   });
 
-  console.log(`✅ Sheets: Appended row to sheet "${sheetName}" in ${spreadsheetId}`);
+  console.log(`✅ Sheets: Appended row to sheet "${targetSheetName}" in ${spreadsheetId}`);
 }
 
 /**

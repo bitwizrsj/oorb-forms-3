@@ -297,4 +297,27 @@ export const integrationsAPI = {
   },
 };
 
+// Collaboration API
+export const collabAPI = {
+  inviteCollaborator: (formId: string, email: string) => {
+    console.log('Collab API: Inviting collaborator:', email);
+    return api.post(`/collab/${formId}/invite`, { email });
+  },
+
+  getCollaborators: (formId: string) => {
+    console.log('Collab API: Getting collaborators for form:', formId);
+    return api.get(`/collab/${formId}`);
+  },
+
+  removeCollaborator: (formId: string, userId: string) => {
+    console.log('Collab API: Removing collaborator:', userId);
+    return api.delete(`/collab/${formId}/remove/${userId}`);
+  },
+
+  acceptInvitation: (token: string) => {
+    console.log('Collab API: Accepting invitation with token');
+    return api.post(`/collab/accept/${token}`);
+  },
+};
+
 export default api;

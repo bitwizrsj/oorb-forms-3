@@ -15,7 +15,7 @@ interface Response {
   submittedAt: string;
   completionTime?: number;
   submitterInfo?: {
-    userId?: string;
+    userId?: any;
     savedToAccount?: boolean;
   };
 }
@@ -328,97 +328,142 @@ const ResponseViewer: React.FC<ResponseViewerProps> = ({ formId, onBack }) => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="max-w-[98%] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {responses.length === 0 ? (
           <div className="text-center py-16">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto">
-              <User className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No responses yet</h3>
-              <p className="text-gray-600">Share your form to start collecting responses.</p>
+            <div className="bg-white rounded-[32px] shadow-xl p-10 max-w-md mx-auto border border-slate-100 animate-in fade-in zoom-in duration-300">
+              <div className="w-20 h-20 bg-slate-50 rounded-[28px] flex items-center justify-center mx-auto mb-6">
+                <User className="w-10 h-10 text-slate-200" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">No responses yet</h3>
+              <p className="text-slate-400 font-medium">Share your form to start collecting data in your new spreadsheet view.</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-4 sm:space-y-6">
-            {responses.map((response, index) => (
-              <div key={response._id} className="bg-white rounded-2xl shadow-md border border-gray-100 p-4 sm:p-6 hover:shadow-lg transition-shadow">
-                {/* Response header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900">
-                      Response #{(currentPage - 1) * 10 + index + 1}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>{new Date(response.submittedAt).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{new Date(response.submittedAt).toLocaleTimeString()}</span>
-                      </div>
-                      {response.completionTime && (
-                        <span className="bg-slate-100 px-2 py-0.5 rounded-full text-xs">{response.completionTime}s</span>
-                      )}
-                      {response.submitterInfo?.savedToAccount && (
-                        <span className="flex items-center space-x-1 text-indigo-600">
-                          <User className="w-3.5 h-3.5" /><span>Account</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
+          <div className="space-y-6">
+            {/* Spreadsheet-like Table Container */}
+            <div className="bg-white rounded-[32px] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+                  <table className="w-full text-left border-collapse min-w-[800px]">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100">
+                        <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap sticky left-0 bg-slate-50/80 z-10">#</th>
+                        <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">Submitted At</th>
+                        <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">Email</th>
+                        {form?.fields.map(field => (
+                          <th key={field.id} className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap min-w-[150px]">
+                            {field.label}
+                          </th>
+                        ))}
+                        {hasQuestions && <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">Score</th>}
+                        <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap sticky right-0 bg-slate-50/80 z-10 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {responses.map((response, index) => {
+                        const score = calculateTestScore(response);
+                        return (
+                          <tr key={response._id} className="group hover:bg-indigo-50/30 transition-colors">
+                            <td className="px-6 py-5 sticky left-0 bg-white group-hover:bg-indigo-50/30 transition-colors z-10 border-r border-slate-50 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]">
+                               <span className="text-sm font-black text-slate-900 leading-none">
+                                 {(currentPage - 1) * 10 + index + 1}
+                               </span>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <span className="text-[13px] font-medium text-slate-600">
+                                {response.submitterInfo?.userId?.email || 'Guest'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <span className="text-[13px] font-bold text-slate-700">{new Date(response.submittedAt).toLocaleDateString()}</span>
+                                <span className="text-[11px] font-medium text-slate-400 italic">{new Date(response.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            </td>
+                            {form?.fields.map(field => {
+                              const r = response.responses.find(res => res.fieldId === field.id);
+                              const { text, isFile } = formatValue(r?.value, field.type);
+                              return (
+                                <td key={field.id} className="px-6 py-5">
+                                  {isFile && r?.value ? (
+                                    <div className="scale-90 origin-left">
+                                      <FilePreview url={r.value} compact />
+                                    </div>
+                                  ) : (
+                                    <div className="text-[13px] font-medium text-slate-600 max-w-[250px] truncate group-hover:whitespace-normal group-hover:overflow-visible group-hover:z-50" title={text}>
+                                      {text || <span className="text-slate-300 italic">No entry</span>}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            {hasQuestions && (
+                              <td className="px-6 py-5">
+                                <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider ${
+                                  (score || 0) >= 80 ? 'bg-emerald-50 text-emerald-600' :
+                                  (score || 0) >= 40 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                }`}>
+                                  {Math.round(score || 0)}%
+                                </span>
+                              </td>
+                            )}
+                            <td className="px-6 py-5 sticky right-0 bg-white group-hover:bg-indigo-50/30 transition-colors z-10 border-l border-slate-50 shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.05)]">
+                              <div className="flex items-center justify-center gap-2">
+                                <button 
+                                  onClick={() => setSelectedResponse(response)} 
+                                  className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-indigo-600 hover:text-white hover:shadow-lg hover:shadow-indigo-100 transition-all active:scale-90"
+                                  title="View Details"
+                                >
+                                  <Eye size={16} />
+                                </button>
+                                {hasQuestions && (
+                                  <button 
+                                    onClick={() => setShowTestResults(response)} 
+                                    className="w-9 h-9 flex items-center justify-center bg-slate-50 text-purple-400 rounded-xl hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-100 transition-all active:scale-90"
+                                    title="Test Results"
+                                  >
+                                    <Award size={16} />
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => deleteResponse(response._id)} 
+                                  className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-600 hover:text-white hover:shadow-lg hover:shadow-rose-100 transition-all active:scale-90"
+                                  title="Delete Response"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+               </div>
+            </div>
 
-                  <div className="flex items-center space-x-2">
-                    <button onClick={() => setSelectedResponse(response)} className="px-3 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-medium transition-colors">
-                      View Details
-                    </button>
-                    {hasQuestions && (
-                      <button onClick={() => setShowTestResults(response)} className="px-3 py-1.5 text-purple-600 hover:bg-purple-50 rounded-lg text-sm font-medium transition-colors">
-                        <Award className="w-4 h-4 inline mr-1" />Test Results
-                      </button>
-                    )}
-                    <button onClick={() => deleteResponse(response._id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete response">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Fields preview */}
-                <div className="grid gap-3">
-                  {hasQuestions && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-purple-900">Test Score</span>
-                      <span className="text-lg font-black text-purple-600">{Math.round(calculateTestScore(response) || 0)}%</span>
-                    </div>
-                  )}
-
-                  {response.responses.slice(0, 3).map((fieldResponse, fieldIndex) => {
-                    const { text, isFile } = formatValue(fieldResponse.value, fieldResponse.fieldType);
-                    return (
-                      <div key={fieldIndex} className="border-l-4 border-indigo-400 pl-3 sm:pl-4 bg-indigo-50 rounded-r-xl p-2.5">
-                        <h4 className="font-semibold text-gray-800 mb-1 text-sm">{fieldResponse.fieldLabel}</h4>
-                        {isFile && fieldResponse.value ? (
-                          <FilePreview url={fieldResponse.value} compact />
-                        ) : (
-                          <p className="text-gray-700 text-sm break-words">{text}</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {response.responses.length > 3 && (
-                    <button onClick={() => setSelectedResponse(response)} className="text-sm text-indigo-500 pl-4 hover:text-indigo-700 font-medium text-left">
-                      +{response.responses.length - 3} more fields → View all
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Pagination */}
+            {/* Premium Pagination */}
             {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2 bg-white rounded-2xl shadow-md p-4">
-                <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 text-sm transition-colors">Previous</button>
-                <span className="px-4 py-2 text-gray-700 text-sm font-medium">Page {currentPage} of {totalPages}</span>
-                <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 text-sm transition-colors">Next</button>
+              <div className="flex items-center justify-between bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100 px-8 animate-in slide-in-from-bottom-2 duration-700">
+                <div className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">
+                   Page <span className="text-indigo-600">{currentPage}</span> of <span className="text-slate-900">{totalPages}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} 
+                    disabled={currentPage === 1} 
+                    className="px-6 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 font-black text-[12px] hover:bg-slate-100 disabled:opacity-30 transition-all active:scale-95"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} 
+                    disabled={currentPage === totalPages} 
+                    className="px-6 py-2.5 bg-indigo-600 border border-indigo-500 rounded-xl text-white font-black text-[12px] shadow-lg shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-30 transition-all active:scale-95"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -458,6 +503,7 @@ const ResponseViewer: React.FC<ResponseViewerProps> = ({ formId, onBack }) => {
               <div className="mt-6 pt-4 border-t border-gray-100">
                 <div className="flex flex-wrap gap-4 text-xs text-gray-400 font-medium">
                   <span>Submitted: {new Date(selectedResponse.submittedAt).toLocaleString()}</span>
+                  <span className="text-slate-500">Submitter: {selectedResponse.submitterInfo?.userId?.email || 'Guest'}</span>
                   {selectedResponse.completionTime && <span>Time: {selectedResponse.completionTime}s</span>}
                   {selectedResponse.submitterInfo?.savedToAccount && <span className="text-indigo-500">✓ Saved to account</span>}
                 </div>

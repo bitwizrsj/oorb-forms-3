@@ -225,7 +225,10 @@ router.get('/form/:formId', authenticateToken, async (req, res) => {
     // Verify user owns the form
     const form = await Form.findOne({
       _id: req.params.formId,
-      createdBy: req.user._id
+      $or: [
+        { createdBy: req.user._id },
+        { collaborators: req.user._id }
+      ]
     });
 
     console.log('Responses route - Form query result:', form ? 'Found' : 'Not found');
@@ -241,6 +244,7 @@ router.get('/form/:formId', authenticateToken, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const responses = await Response.find({ formId: req.params.formId })
+      .populate('submitterInfo.userId', 'email')
       .sort({ submittedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -302,7 +306,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     // Verify user owns the form
     const form = await Form.findOne({
       _id: response.formId,
-      createdBy: req.user._id
+      $or: [
+        { createdBy: req.user._id },
+        { collaborators: req.user._id }
+      ]
     });
 
     if (!form) {

@@ -9,6 +9,7 @@ import folderRoutes from './routes/folders.js';
 import authRoutes from './routes/auth.js';
 import integrationRoutes from './routes/integrations.js';
 import uploadRoutes from './routes/upload.js';
+import collabRoutes from './routes/collab.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,6 +54,7 @@ app.use('/api/folders', folderRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/collab', collabRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

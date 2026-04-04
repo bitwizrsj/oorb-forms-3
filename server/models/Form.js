@@ -81,7 +81,16 @@ const formSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
   views: { type: Number, default: 0 },
   responses: { type: Number, default: 0 },
-  completionRate: { type: Number, default: 0 }
+  completionRate: { type: Number, default: 0 },
+  collaborators: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  pendingCollaborators: [{
+    email: String,
+    token: String,
+    invitedAt: { type: Date, default: Date.now }
+  }]
 });
 
 formSchema.pre('save', function (next) {
