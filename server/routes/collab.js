@@ -30,7 +30,7 @@ router.post('/:formId/invite', authenticateToken, async (req, res) => {
 
     // 2. Check if already a collaborator
     const invitee = await User.findOne({ email: email.toLowerCase() });
-    if (invitee && form.collaborators.includes(invitee._id)) {
+    if (invitee && form.collaborators.some(id => id.toString() === invitee._id.toString())) {
       return res.status(400).json({ error: 'User is already a collaborator' });
     }
 
@@ -95,7 +95,8 @@ router.post('/accept/:token', authenticateToken, async (req, res) => {
     }
 
     // 3. Add to collaborators and remove from pending
-    if (!form.collaborators.includes(req.user._id)) {
+    const userIdStr = req.user._id.toString();
+    if (!form.collaborators.some(id => id.toString() === userIdStr)) {
       form.collaborators.push(req.user._id);
     }
     form.pendingCollaborators = form.pendingCollaborators.filter(p => p.token !== token);

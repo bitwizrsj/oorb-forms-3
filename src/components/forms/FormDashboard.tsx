@@ -182,7 +182,10 @@ const FormDashboard: React.FC<FormDashboardProps> = ({ onCreateForm, onEditForm,
   const toggleDropdown = (id: string, e: React.MouseEvent) => { e.stopPropagation(); setActiveDropdown(p => p === id ? null : id); };
 
   /* ── Derived ───────────────────────────────────── */
-  const standalone = useMemo(() => forms.filter(f => !f.folderId), [forms]);
+  const standalone = useMemo(() => {
+    const folderIds = new Set(folders.map(f => f._id));
+    return forms.filter(f => !f.folderId || !folderIds.has(f.folderId));
+  }, [forms, folders]);
   const filteredForms = useMemo(() => standalone.filter(f => {
     const q = searchTerm.toLowerCase();
     return (f.title.toLowerCase().includes(q) || f.description.toLowerCase().includes(q)) &&
@@ -191,7 +194,9 @@ const FormDashboard: React.FC<FormDashboardProps> = ({ onCreateForm, onEditForm,
   const filteredFolders = useMemo(() => folders.filter(f =>
     f.name.toLowerCase().includes(searchTerm.toLowerCase())
   ), [folders, searchTerm]);
-  const getFormsInFolder = useCallback((id: string) => forms.filter(f => f.folderId === id), [forms]);
+  const getFormsInFolder = useCallback((id: string) => {
+    return forms.filter(f => f.folderId === id && user && (f.createdBy?._id === user._id || f.collaborators?.includes(user._id)));
+  }, [forms, user]);
   const isEmpty = filteredFolders.length === 0 && filteredForms.length === 0;
 
   /* ── Context menu renderer ─────────────────────── */
