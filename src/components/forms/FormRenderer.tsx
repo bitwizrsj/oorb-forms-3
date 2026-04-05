@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Star, Upload, Send, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { formAPI, responseAPI } from '../../services/api';
 import FormHeader from './FormHeader';
-import ResponseSavePrompt from './ResponseSavePrompt';
+import SubmissionConfirmModal from './SubmissionConfirmModal';
 import toast from 'react-hot-toast';
 import FileUploadField from './FileUploadField';
 import QuestionAnswerField from './QuestionAnswerField';
@@ -54,7 +54,7 @@ const FormRenderer: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
-  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [startTime] = useState(Date.now());
   const [user, setUser] = useState<any>(null);
@@ -207,9 +207,9 @@ const FormRenderer: React.FC = () => {
       return;
     }
 
-    // Show save prompt if user is not logged in
+    // Show confirmation modal if user is not logged in
     if (!user && !form.settings?.requireLogin) {
-      setShowSavePrompt(true);
+      setShowConfirmModal(true);
       return;
     }
 
@@ -784,10 +784,10 @@ const FormRenderer: React.FC = () => {
         </div>
       )}
 
-      <ResponseSavePrompt
-        isOpen={showSavePrompt}
-        onClose={() => setShowSavePrompt(false)}
-        onSaveResponse={submitResponse}
+      <SubmissionConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => submitResponse(false)}
         formTitle={form.title}
       />
     </div>
