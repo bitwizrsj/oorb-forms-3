@@ -22,7 +22,10 @@ const responseSchema = new mongoose.Schema({
     savedToAccount: { type: Boolean, default: false }
   },
   completionTime: Number,
-  isComplete: { type: Boolean, default: true }
+  isComplete: { type: Boolean, default: true },
+  isEditable: { type: Boolean, default: false },
+  emailCopyRequested: { type: Boolean, default: false },
+  lastEditedAt: { type: Date, default: null }
 });
 
 export default mongoose.models.Response ||

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Star, Upload, Send, CheckCircle, AlertCircle, FileText } from 'lucide-react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { Star, Upload, Send, CheckCircle, AlertCircle, FileText, Edit3, Eye, X } from 'lucide-react';
 import { formAPI, responseAPI } from '../../services/api';
 import FormHeader from './FormHeader';
-import SubmissionConfirmModal from './SubmissionConfirmModal';
 import toast from 'react-hot-toast';
 import FileUploadField from './FileUploadField';
 import QuestionAnswerField from './QuestionAnswerField';
@@ -38,6 +37,9 @@ interface Form {
     showProgressBar?: boolean;
     headerImage?: string;
     allowedEmailDomains?: string[];
+    allowEditing?: boolean;
+    emailCopy?: boolean;
+    editingDuration?: number;
   };
   views?: number;
   responses?: number;
@@ -58,25 +60,92 @@ const FormRenderer: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [startTime] = useState(Date.now());
   const [user, setUser] = useState<any>(null);
+  const [searchParams] = useSearchParams();
+  const editResponseId = searchParams.get('edit');
+  const [isEditMode, setIsEditMode] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
   const [domainDenied, setDomainDenied] = useState<string | null>(null);
+  const [submittedResponseId, setSubmittedResponseId] = useState<string | null>(null);
+  const [showSubmittedResponse, setShowSubmittedResponse] = useState(false);
+
+  const formatValue = (value: any) => {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    return value?.toString() || 'No answer';
+  };
 
   useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('user');
-    if (userData) {
+    const fetchData = async () => {
+      if (!shareUrl) return;
       try {
-        setUser(JSON.parse(userData));
+        setLoading(true);
+        const formRes = await formAPI.getFormByShareUrl(shareUrl);
+        const formData = formRes.data;
+        setForm(formData);
+
+        // If in edit mode, fetch the response data
+        if (editResponseId) {
+          try {
+            const responseRes = await responseAPI.getResponse(editResponseId);
+            const responseData = responseRes.data;
+            
+            // Check editing duration limit
+            if (formData.settings?.editingDuration > 0) {
+              const minutesSinceSubmission = (Date.now() - new Date(responseData.submittedAt).getTime()) / (1000 * 60);
+              if (minutesSinceSubmission > formData.settings.editingDuration) {
+                setIsClosed(true);
+                toast.error(`The time limit for editing (${formData.settings.editingDuration} minutes) has passed.`);
+              }
+            }
+
+            // Map saved responses to the component state
+            const initialResponses: Record<string, any> = {};
+            responseData.responses.forEach((r: any) => {
+              initialResponses[r.fieldId] = r.value;
+            });
+            setResponses(initialResponses);
+            setIsEditMode(true);
+          } catch (err) {
+            console.error('Error fetching response for edit:', err);
+            toast.error('Could not load your previous response.');
+          }
+        }
+
+        // View count
+        const sessionKey = `viewed_${formData._id}`;
+        if (!sessionStorage.getItem(sessionKey)) {
+          formAPI.incrementView(shareUrl).catch(err => console.error('Error incrementing view:', err));
+          sessionStorage.setItem(sessionKey, 'true');
+        }
+        
+        // Status checks
+        if (formData.status === 'closed' || (formData.settings?.expiryDate && new Date() > new Date(formData.settings.expiryDate))) {
+          setIsClosed(true);
+        }
+
+        // Calculate estimated time
+        const estimatedTime = Math.ceil(formData.fields.length * 0.5);
+        setForm(prev => prev ? { ...prev, estimatedTime } : null);
       } catch (error) {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        console.error('Error loading form:', error);
+        toast.error('Failed to load form');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error('Error parsing user from localStorage', e);
       }
     }
-
-    if (shareUrl) {
-      loadForm();
-    }
-  }, [shareUrl]);
+  }, [shareUrl, editResponseId]);
 
   useEffect(() => {
     // Check login + domain restriction when form and user load
@@ -102,40 +171,7 @@ const FormRenderer: React.FC = () => {
       }
     }
   }, [form, user]);
-  const loadForm = async () => {
-    try {
-      const response = await formAPI.getFormByShareUrl(shareUrl!);
-      const formData = response.data;
-      setForm(formData);
 
-      // --- View Throttling ---
-      // Only increment view count once per session
-      const sessionKey = `viewed_${formData._id}`;
-      if (!sessionStorage.getItem(sessionKey)) {
-        formAPI.incrementView(shareUrl!).catch(err => console.error('Error incrementing view:', err));
-        sessionStorage.setItem(sessionKey, 'true');
-      }
-
-      // Check if closed
-      if (formData.status === 'closed') {
-        setIsClosed(true);
-      }
-
-      // --- Expiry check ---
-      if (formData.settings?.expiryDate && new Date() > new Date(formData.settings.expiryDate)) {
-        setIsClosed(true);
-      }
-
-      // Calculate estimated time (rough estimate: 30 seconds per field)
-      const estimatedTime = Math.ceil(formData.fields.length * 0.5);
-      setForm(prev => prev ? { ...prev, estimatedTime } : null);
-    } catch (error) {
-      toast.error('Form not found');
-      console.error('Error loading form:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const validateField = (field: FormField, value: any): string | null => {
     if (field.required && (!value || (Array.isArray(value) && value.length === 0))) {
@@ -207,17 +243,17 @@ const FormRenderer: React.FC = () => {
       return;
     }
 
-    // Show confirmation modal if user is not logged in
-    if (!user && !form.settings?.requireLogin) {
-      setShowConfirmModal(true);
-      return;
-    }
+    // Skip modal and submit directly per user request
+    // Default to form settings for editable/email copy if enabled
+    const submissionOptions = {
+      isEditable: form.settings?.allowEditing || false,
+      emailCopyRequested: form.settings?.emailCopy || false
+    };
 
-    // Submit directly if user is logged in
-    await submitResponse(true, user);
+    await submitResponse(!!user, user, submissionOptions);
   };
 
-  const submitResponse = async (saveToAccount: boolean, userData?: any) => {
+  const submitResponse = async (saveToAccount: boolean, userData?: any, options?: { isEditable: boolean; emailCopyRequested: boolean }) => {
     if (!form) return;
 
     setSubmitting(true);
@@ -232,7 +268,7 @@ const FormRenderer: React.FC = () => {
 
       const completionTime = Math.round((Date.now() - startTime) / 1000);
 
-      await responseAPI.submitResponse({
+      const payload = {
         formId: form._id,
         responses: formattedResponses,
         completionTime,
@@ -242,13 +278,29 @@ const FormRenderer: React.FC = () => {
           timestamp: new Date().toISOString(),
           userId: saveToAccount && userData ? userData._id : null,
           savedToAccount: saveToAccount
-        }
-      });
+        },
+        isEditable: options?.isEditable || false,
+        emailCopyRequested: options?.emailCopyRequested || false
+      };
 
+      let newResponseId = editResponseId;
+      if (isEditMode && editResponseId) {
+        await responseAPI.updateResponse(editResponseId, {
+          responses: formattedResponses,
+          completionTime
+        });
+        toast.success('Response updated successfully!');
+      } else {
+        const res = await responseAPI.submitResponse(payload);
+        newResponseId = res.data.responseId;
+        toast.success('Form submitted successfully!');
+      }
+
+      setSubmittedResponseId(newResponseId);
       setSubmitted(true);
-      toast.success('Form submitted successfully!');
-    } catch (error) {
-      toast.error('Failed to submit form');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || 'Failed to submit form';
+      toast.error(errorMsg);
       console.error('Error submitting form:', error);
     } finally {
       setSubmitting(false);
@@ -584,29 +636,72 @@ const FormRenderer: React.FC = () => {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center">
-          <div className="bg-white rounded-sm shadow-sm border border-gray-200 p-6 sm:p-8">
-            <CheckCircle className="w-12 h-12 sm:w-16 sm:h-16 text-green-500 mx-auto mb-4" />
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-              Thank You{user ? `, ${user.name}` : ''}!
-            </h1>
-            <p className="text-gray-600 mb-4">Your response has been submitted successfully.</p>
-            {user && (
-              <div className="space-y-3">
-                <p className="text-sm text-blue-600">
-                  Your response has been saved to your account.
-                </p>
-                <button
-                  onClick={() => window.open('/oorb-forms', '_blank')}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                >
-                  View Your Form History
-                </button>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[40px] shadow-2xl shadow-indigo-100/50 max-w-lg w-full p-12 text-center animate-in fade-in zoom-in duration-500 border border-slate-100">
+          <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce transition-transform duration-1000">
+            <CheckCircle className="w-12 h-12 text-indigo-600" />
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Form Submitted Successfully!</h2>
+          <p className="text-slate-500 font-medium text-lg leading-relaxed mb-10">
+            Thank you for your response to <strong className="text-indigo-600 font-bold">"{form?.title}"</strong>.
+          </p>
+          <div className="space-y-4">
+            {form?.settings?.allowEditing && user && (
+              <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                 <p className="text-sm text-slate-600 mb-4 font-semibold">Want to change something?</p>
+                 <button
+                   onClick={() => window.location.href = `/form/${shareUrl}?edit=${submittedResponseId}`}
+                   className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                 >
+                   <Edit3 className="w-4 h-4" />
+                   Edit Your Response
+                 </button>
               </div>
             )}
+            <button
+              onClick={() => setShowSubmittedResponse(true)}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 border-2 border-slate-200 text-slate-700 font-bold rounded-2xl hover:bg-slate-50 transition-all"
+            >
+              <Eye className="w-4 h-4" />
+              See your response
+            </button>
           </div>
         </div>
+
+        {/* Local View Response Modal */}
+        {showSubmittedResponse && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200 text-left">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Your Response Details</h3>
+                  <p className="text-slate-500 text-sm mt-0.5">Submitted answers for {form?.title}</p>
+                </div>
+                <button
+                  onClick={() => setShowSubmittedResponse(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="space-y-4">
+                  {form?.fields.map((field) => (
+                    <div key={field.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                      <h5 className="font-semibold text-slate-700 text-sm mb-2">
+                        {field.label}
+                      </h5>
+                      <p className="text-slate-900 font-medium break-words text-[15px]">
+                        {formatValue(responses[field.id])}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -784,12 +879,7 @@ const FormRenderer: React.FC = () => {
         </div>
       )}
 
-      <SubmissionConfirmModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirm={() => submitResponse(false)}
-        formTitle={form.title}
-      />
+      {/* No modal needed as per user request */}
     </div>
   );
 };

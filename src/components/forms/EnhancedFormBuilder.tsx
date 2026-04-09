@@ -108,6 +108,9 @@ interface Form {
       backgroundColor: string;
     };
     expiryDate?: string | Date | null;
+    allowEditing?: boolean;
+    emailCopy?: boolean;
+    editingDuration?: number;
   };
   theme?: {
     primaryColor: string;
@@ -165,7 +168,10 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
       primaryColor: '#3B82F6',
       backgroundColor: '#FFFFFF'
     },
-    expiryDate: null as string | Date | null
+    expiryDate: null as string | Date | null,
+    allowEditing: false,
+    emailCopy: false,
+    editingDuration: 0
   });
   const [domainInput, setDomainInput] = useState('');
 
@@ -226,7 +232,10 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
           primaryColor: '#3B82F6',
           backgroundColor: '#FFFFFF'
         },
-        expiryDate: form.settings!.expiryDate || null
+        expiryDate: form.settings!.expiryDate || null,
+        allowEditing: form.settings!.allowEditing || false,
+        emailCopy: form.settings!.emailCopy || false,
+        editingDuration: form.settings!.editingDuration || 0
       }));
     }
   }, [form._id]);
@@ -1226,6 +1235,72 @@ const EnhancedFormBuilder: React.FC<EnhancedFormBuilderProps> = ({ formId, onBac
                           <AlertCircle size={12} /> This date is in the past. The form will be closed immediately upon saving.
                         </p>
                       )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Respondent Experience ───────────────── */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-base font-bold text-slate-900 mb-1">Respondent Experience</h3>
+                  <p className="text-xs text-slate-400 mb-5">Customize how submitters interact with their responses</p>
+
+                  <div className="space-y-4">
+                    {/* Allow Editing */}
+                    <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          id="allowEditing"
+                          checked={formSettings.allowEditing}
+                          onChange={(e) => setFormSettings(prev => ({ ...prev, allowEditing: e.target.checked }))}
+                          className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="allowEditing" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                            Allow submitters to edit their responses
+                          </label>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Submitters can modify their answers after submission (requires account).
+                          </p>
+                        </div>
+                      </div>
+
+                      {formSettings.allowEditing && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Editing Time Limit (minutes)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={formSettings.editingDuration}
+                              onChange={(e) => setFormSettings(prev => ({ ...prev, editingDuration: parseInt(e.target.value) || 0 }))}
+                              className="w-24 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-5 italic">
+                            0 = No time limit (until form expires)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Email Copy */}
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        id="emailCopy"
+                        checked={formSettings.emailCopy}
+                        onChange={(e) => setFormSettings(prev => ({ ...prev, emailCopy: e.target.checked }))}
+                        className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <label htmlFor="emailCopy" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                          Send a copy of responses to submitters
+                        </label>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Let users opt-in to receive an email copy of their submission.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

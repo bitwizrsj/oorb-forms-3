@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Calendar, Clock, ChevronRight, Search, Inbox } from 'lucide-react';
+import { FileText, Calendar, Clock, Search, Inbox, Eye, Edit3, X } from 'lucide-react';
 import { responseAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -10,12 +10,22 @@ interface UserResponse {
   responses: any[];
   submittedAt: string;
   completionTime?: number;
+  isEditable?: boolean;
+  shareUrl?: string;
 }
 
 const UserResponses: React.FC = () => {
   const [responses, setResponses] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedResponse, setSelectedResponse] = useState<UserResponse | null>(null);
+
+  const formatValue = (value: any) => {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    return value?.toString() || 'No answer';
+  };
 
   useEffect(() => {
     loadResponses();
@@ -116,8 +126,23 @@ const UserResponses: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-slate-300 group-hover:text-indigo-500 transition-colors">
-                  <ChevronRight size={20} />
+                <div className="flex items-center gap-2 mt-4 sm:mt-0 sm:ml-auto">
+                  <button
+                    onClick={() => setSelectedResponse(response)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-colors"
+                  >
+                    <Eye size={16} />
+                    See
+                  </button>
+                  {response.isEditable && response.shareUrl && (
+                    <button
+                      onClick={() => window.open(`/form/${response.shareUrl}?edit=${response._id}`, '_self')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
+                    >
+                      <Edit3 size={16} />
+                      Edit
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -132,6 +157,45 @@ const UserResponses: React.FC = () => {
           <p className="text-slate-400 text-sm max-w-xs mt-1">
             {searchTerm ? "Try searching for something else." : "You haven't submitted any forms yet."}
           </p>
+        </div>
+      )}
+      
+      {/* Response Detail Modal */}
+      {selectedResponse && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Response Details</h3>
+                <p className="text-slate-500 text-sm mt-0.5">Submitted on {new Date(selectedResponse.submittedAt).toLocaleString()}</p>
+              </div>
+              <button
+                onClick={() => setSelectedResponse(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-6">
+                <h4 className="font-bold text-indigo-900 text-lg mb-1">{selectedResponse.formTitle}</h4>
+              </div>
+              
+              <div className="space-y-4">
+                {selectedResponse.responses.map((fieldResponse, index) => (
+                  <div key={index} className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                    <h5 className="font-semibold text-slate-700 text-sm mb-2">
+                      {fieldResponse.fieldLabel}
+                    </h5>
+                    <p className="text-slate-900 font-medium break-words text-[15px]">
+                      {formatValue(fieldResponse.value)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

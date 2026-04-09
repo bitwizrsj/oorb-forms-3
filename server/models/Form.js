@@ -64,7 +64,10 @@ const formSchema = new mongoose.Schema({
       primaryColor: { type: String, default: '#3B82F6' },
       backgroundColor: { type: String, default: '#FFFFFF' }
     },
-    expiryDate: { type: Date, default: null }
+    expiryDate: { type: Date, default: null },
+    allowEditing: { type: Boolean, default: false },
+    emailCopy: { type: Boolean, default: false },
+    editingDuration: { type: Number, default: 0 } // in minutes, 0 means until form expires
   },
   status: {
     type: String,

@@ -76,7 +76,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // Submit form response (public - no authentication needed)
 router.post('/', async (req, res) => {
   try {
-    const { formId, responses, submitterInfo, completionTime, userId } = req.body;
+    const { formId, responses, submitterInfo, completionTime, userId, isEditable, emailCopyRequested } = req.body;
 
     // Verify form exists and is published
     const form = await Form.findById(formId);
@@ -126,7 +126,9 @@ router.post('/', async (req, res) => {
         savedToAccount: !!userId
       },
       completionTime,
-      submittedAt: new Date()
+      submittedAt: new Date(),
+      isEditable: !!isEditable,
+      emailCopyRequested: !!emailCopyRequested
     });
 
     await response.save();
@@ -181,6 +183,54 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // ── Email copy to submitter ───────────────────────────────────────────
+    if (emailCopyRequested && process.env.EMAIL_USER) {
+      try {
+        let recipientEmail = submitterInfo?.email;
+        if (userId) {
+          const submitterUser = await User.findById(userId).select('email');
+          if (submitterUser) recipientEmail = submitterUser.email;
+        }
+
+        if (recipientEmail) {
+          const emailContent = responses
+            .map(r => `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;color:#374151;width:40%">${r.fieldLabel}</td><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#6B7280">${Array.isArray(r.value) ? r.value.join(', ') : r.value || '—'}</td></tr>`)
+            .join('');
+
+          await transporter.sendMail({
+            from: `"OORB Forms" <${process.env.EMAIL_USER}>`,
+            to: recipientEmail,
+            subject: `📄 Your Response Copy: ${form.title}`,
+            html: `
+              <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff">
+                <div style="background:#10B981;padding:24px 32px;border-radius:12px 12px 0 0">
+                  <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700">Thank you for your response!</h1>
+                  <p style="color:#D1FAE5;margin:4px 0 0;font-size:14px">Here is a copy of what you submitted to "${form.title}"</p>
+                </div>
+                <div style="padding:24px 32px">
+                  <table style="width:100%;border-collapse:collapse;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden">
+                    <thead><tr><th style="padding:10px 12px;background:#F9FAFB;text-align:left;font-size:12px;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em">Field</th><th style="padding:10px 12px;background:#F9FAFB;text-align:left;font-size:12px;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em">Your Answer</th></tr></thead>
+                    <tbody>${emailContent}</tbody>
+                  </table>
+                  ${isEditable ? `
+                  <div style="margin-top:24px;padding:16px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:8px">
+                    <p style="margin:0;font-size:13px;color:#1E40AF">Need to change something? You can edit your response in your <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="color:#2563EB;font-weight:600">Response History</a>.</p>
+                  </div>
+                  ` : ''}
+                </div>
+                <div style="padding:16px 32px;background:#F9FAFB;border-top:1px solid #E5E7EB;border-radius:0 0 12px 12px">
+                  <p style="margin:0;font-size:12px;color:#9CA3AF">Powered by OORB Forms · Do not reply to this email.</p>
+                </div>
+              </div>
+            `
+          });
+          console.log(`📧 Response copy sent to submitter: ${recipientEmail} for form: ${form.title}`);
+        }
+      } catch (submitterEmailError) {
+        console.error('Submitter email copy failed:', submitterEmailError.message);
+      }
+    }
+
     // ── Google Sheets integration ───────────────────────────────────────────
     if (
       form.settings?.googleSheets?.enabled &&
@@ -209,6 +259,61 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Update an existing response (only if allowEditing is true and user owns the response)
+router.patch('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { responses, completionTime } = req.body;
+    const responseId = req.params.id;
+
+    const existingResponse = await Response.findById(responseId);
+    if (!existingResponse) {
+      return res.status(404).json({ error: 'Response not found' });
+    }
+
+    // Verify user owns the response
+    if (existingResponse.submitterInfo.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Access denied. You can only edit your own responses.' });
+    }
+
+    const form = await Form.findById(existingResponse.formId);
+    if (!form) {
+      return res.status(404).json({ error: 'Form not found' });
+    }
+
+    // Check if form allows editing
+    if (!form.settings?.allowEditing || !existingResponse.isEditable) {
+      return res.status(400).json({ error: 'Editing is not enabled for this form or submission.' });
+    }
+
+    // Check expiry date
+    if (form.settings?.expiryDate && new Date() > new Date(form.settings.expiryDate)) {
+      return res.status(400).json({ error: 'This form has expired. Editing is no longer allowed.' });
+    }
+
+    // Check editing duration limit
+    if (form.settings?.editingDuration > 0) {
+      const minutesSinceSubmission = (Date.now() - existingResponse.submittedAt.getTime()) / (1000 * 60);
+      if (minutesSinceSubmission > form.settings.editingDuration) {
+        return res.status(400).json({ error: `The time limit for editing (${form.settings.editingDuration} minutes) has passed.` });
+      }
+    }
+
+    // Update response fields
+    existingResponse.responses = responses;
+    if (completionTime) existingResponse.completionTime = completionTime;
+    existingResponse.lastEditedAt = new Date();
+
+    await existingResponse.save();
+
+    res.json({
+      message: 'Response updated successfully',
+      responseId: existingResponse._id
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -267,6 +372,68 @@ router.get('/form/:formId', authenticateToken, async (req, res) => {
   }
 });
 
+// Get user's own responses (forms they've submitted to)
+router.get('/my-responses', authenticateToken, async (req, res) => {
+  try {
+    console.log('MY_RESPONSES_DEBUG: Starting fetch for user:', req.user._id);
+
+    // 1. Find responses
+    const responses = await Response.find({
+      'submitterInfo.userId': req.user._id,
+      'submitterInfo.savedToAccount': true
+    })
+      .populate('formId', 'title description settings shareUrl')
+      .sort({ submittedAt: -1 });
+
+    console.log(`MY_RESPONSES_DEBUG: Found ${responses.length} responses in DB`);
+
+    // 2. Filter and Map with extreme caution
+    const formattedResponses = responses
+      .filter(r => {
+        if (!r.formId) {
+          console.log(`MY_RESPONSES_DEBUG: Skipping response ${r._id} - formId is null (likely deleted form)`);
+          return false;
+        }
+        return true;
+      })
+      .map(response => {
+        try {
+          // Mongoose populate might return the ID if population fails, 
+          // or the object if it succeeds.
+          const form = response.formId;
+          const formIdStr = form._id ? form._id.toString() : form.toString();
+          const formTitleStr = form.title || 'Untitled Form';
+
+          return {
+            _id: response._id,
+            formId: formIdStr,
+            formTitle: formTitleStr,
+            responses: response.responses || [],
+            submittedAt: response.submittedAt,
+            completionTime: response.completionTime,
+            isEditable: form.settings?.allowEditing || response.isEditable || false,
+            shareUrl: form.shareUrl
+          };
+        } catch (mapError) {
+          console.error('MY_RESPONSES_DEBUG: Error mapping individual response:', response._id, mapError);
+          return null;
+        }
+      })
+      .filter(Boolean); // Remove any that failed mapping
+
+    console.log(`MY_RESPONSES_DEBUG: Returning ${formattedResponses.length} formatted responses`);
+    res.json(formattedResponses);
+  } catch (error) {
+    console.error('MY_RESPONSES_DEBUG: FATAL ERROR in my-responses route:');
+    console.error(error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch your responses', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Get single response (only if user owns the form)
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
@@ -277,13 +444,20 @@ router.get('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Response not found' });
     }
 
-    // Verify user owns the form
+    // Verify user owns the response
+    const isSubmitter = response.submitterInfo && response.submitterInfo.userId && 
+                        response.submitterInfo.userId.toString() === req.user._id.toString();
+
+    // Verify user owns the form (or is a collaborator)
     const form = await Form.findOne({
       _id: response.formId,
-      createdBy: req.user._id
+      $or: [
+        { createdBy: req.user._id },
+        { collaborators: req.user._id }
+      ]
     });
 
-    if (!form) {
+    if (!form && !isSubmitter) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -331,64 +505,5 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user's own responses (forms they've submitted to)
-router.get('/my-responses', authenticateToken, async (req, res) => {
-  try {
-    console.log('MY_RESPONSES_DEBUG: Starting fetch for user:', req.user._id);
-
-    // 1. Find responses
-    const responses = await Response.find({
-      'submitterInfo.userId': req.user._id,
-      'submitterInfo.savedToAccount': true
-    })
-      .populate('formId', 'title description')
-      .sort({ submittedAt: -1 });
-
-    console.log(`MY_RESPONSES_DEBUG: Found ${responses.length} responses in DB`);
-
-    // 2. Filter and Map with extreme caution
-    const formattedResponses = responses
-      .filter(r => {
-        if (!r.formId) {
-          console.log(`MY_RESPONSES_DEBUG: Skipping response ${r._id} - formId is null (likely deleted form)`);
-          return false;
-        }
-        return true;
-      })
-      .map(response => {
-        try {
-          // Mongoose populate might return the ID if population fails, 
-          // or the object if it succeeds.
-          const form = response.formId;
-          const formIdStr = form._id ? form._id.toString() : form.toString();
-          const formTitleStr = form.title || 'Untitled Form';
-
-          return {
-            _id: response._id,
-            formId: formIdStr,
-            formTitle: formTitleStr,
-            responses: response.responses || [],
-            submittedAt: response.submittedAt,
-            completionTime: response.completionTime
-          };
-        } catch (mapError) {
-          console.error('MY_RESPONSES_DEBUG: Error mapping individual response:', response._id, mapError);
-          return null;
-        }
-      })
-      .filter(Boolean); // Remove any that failed mapping
-
-    console.log(`MY_RESPONSES_DEBUG: Returning ${formattedResponses.length} formatted responses`);
-    res.json(formattedResponses);
-  } catch (error) {
-    console.error('MY_RESPONSES_DEBUG: FATAL ERROR in my-responses route:');
-    console.error(error.stack);
-    res.status(500).json({ 
-      error: 'Failed to fetch your responses', 
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-});
 
 export default router;

@@ -218,6 +218,11 @@ export const responseAPI = {
     return api.post('/responses', responseData);
   },
 
+  updateResponse: (id: string, responseData: any) => {
+    console.log('Response API: Updating response:', id);
+    return api.patch(`/responses/${id}`, responseData);
+  },
+
   getResponses: (formId: string, page = 1, limit = 10) => {
     console.log('Response API: Getting responses for form:', formId, 'page:', page, 'limit:', limit);
     const url = `/responses/form/${formId}?page=${page}&limit=${limit}`;

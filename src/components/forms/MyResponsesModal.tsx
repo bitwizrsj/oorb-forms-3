@@ -13,6 +13,8 @@ interface MyResponse {
   }>;
   submittedAt: string;
   completionTime?: number;
+  isEditable?: boolean;
+  shareUrl?: string;
 }
 
 interface MyResponsesModalProps {
@@ -117,10 +119,19 @@ const MyResponsesModal: React.FC<MyResponsesModalProps> = ({ onClose }) => {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => setSelectedResponse(response)}
-                        className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                        className="px-3 py-1 text-indigo-600 hover:bg-indigo-50 rounded text-sm font-semibold"
                       >
                         View Details
                       </button>
+                      {response.isEditable && response.shareUrl && (
+                        <button
+                          onClick={() => window.open(`/form/${response.shareUrl}?edit=${response._id}`, '_self')}
+                          className="px-3 py-1 bg-indigo-600 text-white hover:bg-indigo-700 rounded text-sm font-semibold flex items-center gap-1.5"
+                        >
+                          <Clock size={12} />
+                          Edit Response
+                        </button>
+                      )}
                       <button
                         onClick={() => window.open(`/form/${response.formId}`, '_blank')}
                         className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded text-sm"
