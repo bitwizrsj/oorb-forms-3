@@ -67,6 +67,8 @@ const FormRenderer: React.FC = () => {
   const [domainDenied, setDomainDenied] = useState<string | null>(null);
   const [submittedResponseId, setSubmittedResponseId] = useState<string | null>(null);
   const [showSubmittedResponse, setShowSubmittedResponse] = useState(false);
+  const [alreadySubmittedResponse, setAlreadySubmittedResponse] = useState<any>(null);
+  const [hasCheckedSubmission, setHasCheckedSubmission] = useState(false);
 
   const formatValue = (value: any) => {
     if (Array.isArray(value)) {
@@ -171,6 +173,57 @@ const FormRenderer: React.FC = () => {
       }
     }
   }, [form, user]);
+
+  useEffect(() => {
+    const checkAlreadySubmitted = async () => {
+      // Don't check until form is loaded, and only if we are NOT in edit mode.
+      if (!form || isEditMode || !shareUrl) {
+        setHasCheckedSubmission(true);
+        return;
+      }
+
+      if (form.settings?.allowMultipleResponses === false) {
+        let existingId = null;
+
+        if (user) {
+          try {
+            const r = await responseAPI.getMyResponses();
+            const existing = r.data.find((res: any) => res.shareUrl === shareUrl);
+            if (existing) {
+              existingId = existing._id;
+            }
+          } catch (e) { console.error(e); }
+        } else {
+          try {
+            const local = JSON.parse(localStorage.getItem('oorb_submissions') || '{}');
+            existingId = local[shareUrl];
+          } catch (e) { console.error(e); }
+        }
+
+        if (existingId) {
+          try {
+            const resData = await responseAPI.getResponse(existingId);
+            setAlreadySubmittedResponse(resData.data);
+            
+            const initialResponses: Record<string, any> = {};
+            resData.data.responses.forEach((r: any) => {
+              initialResponses[r.fieldId] = r.value;
+            });
+            setResponses(initialResponses);
+            setSubmittedResponseId(existingId);
+          } catch (e) {
+             setAlreadySubmittedResponse({ _id: existingId, error: true });
+             setSubmittedResponseId(existingId);
+          }
+        }
+      }
+      
+      setHasCheckedSubmission(true);
+    };
+
+    checkAlreadySubmitted();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, user, isEditMode, shareUrl]);
 
 
   const validateField = (field: FormField, value: any): string | null => {
@@ -294,6 +347,14 @@ const FormRenderer: React.FC = () => {
         const res = await responseAPI.submitResponse(payload);
         newResponseId = res.data.responseId;
         toast.success('Form submitted successfully!');
+        
+        try {
+          const localSubmitted = JSON.parse(localStorage.getItem('oorb_submissions') || '{}');
+          if (shareUrl) {
+            localSubmitted[shareUrl] = newResponseId;
+            localStorage.setItem('oorb_submissions', JSON.stringify(localSubmitted));
+          }
+        } catch (e) { console.error('Error saving local submission state:', e); }
       }
 
       setSubmittedResponseId(newResponseId);
@@ -630,6 +691,88 @@ const FormRenderer: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (form && !hasCheckedSubmission && form.settings?.allowMultipleResponses === false && !isEditMode) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (alreadySubmittedResponse && !isEditMode) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[40px] shadow-2xl shadow-indigo-100/50 max-w-lg w-full p-12 text-center animate-in fade-in zoom-in duration-500 border border-slate-100">
+          <div className="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-8 transition-transform duration-1000">
+            <CheckCircle className="w-12 h-12 text-amber-600" />
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">You have already filled the form</h2>
+          <p className="text-slate-500 font-medium text-lg leading-relaxed mb-10">
+            This form is set to only accept a single response per person.
+          </p>
+          <div className="space-y-4">
+            {form?.settings?.allowEditing && user && (
+              <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                 <p className="text-sm text-slate-600 mb-4 font-semibold">Want to change something?</p>
+                 <button
+                   onClick={() => window.location.href = `/form/${shareUrl}?edit=${submittedResponseId}`}
+                   className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                 >
+                   <Edit3 className="w-4 h-4" />
+                   Edit Your Response
+                 </button>
+              </div>
+            )}
+            {!alreadySubmittedResponse.error && (
+              <button
+                onClick={() => setShowSubmittedResponse(true)}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 border-2 border-slate-200 text-slate-700 font-bold rounded-2xl hover:bg-slate-50 transition-all"
+              >
+                <Eye className="w-4 h-4" />
+                See your response
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Local View Response Modal */}
+        {showSubmittedResponse && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200 text-left">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Your Response Details</h3>
+                  <p className="text-slate-500 text-sm mt-0.5">Submitted answers for {form?.title}</p>
+                </div>
+                <button
+                  onClick={() => setShowSubmittedResponse(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="space-y-4">
+                  {form?.fields.map((field) => (
+                    <div key={field.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                      <h5 className="font-semibold text-slate-700 text-sm mb-2">
+                        {field.label}
+                      </h5>
+                      <p className="text-slate-900 font-medium break-words text-[15px]">
+                        {formatValue(responses[field.id])}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
