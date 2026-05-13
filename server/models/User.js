@@ -18,7 +18,12 @@ const userSchema = new mongoose.Schema({
     theme: { type: String, enum: ['light', 'dark'], default: 'light' },
     notifications: { type: Boolean, default: true },
     language: { type: String, default: 'en' }
-  }
+  },
+
+  // Verification
+  isVerified: { type: Boolean, default: false },
+  otp: { type: String, default: null },
+  otpExpires: { type: Date, default: null }
 });
 
 // Hash password before saving

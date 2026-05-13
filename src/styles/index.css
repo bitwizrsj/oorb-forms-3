@@ -3,34 +3,20 @@
 @tailwind utilities;
 
 @layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
+  :root {
+    --gradient-color: #6366f1;
+    --sparkles-color: #6366f1;
   }
 
-  /* Prevent accidental horizontal scroll on mobile due to wide children (tables, code, etc.) */
-  body {
-    overflow-x: hidden;
-  }
-
-  img,
-  video,
-  canvas,
-  svg {
-    max-width: 100%;
-    height: auto;
-  }
-
-  /* Reasonable default wrapping (don't break UI labels letter-by-letter) */
-  body {
-    overflow-wrap: break-word;
+  .dark {
+    --gradient-color: #6366f1;
+    --sparkles-color: #ffffff;
   }
 }
 
-@layer utilities {
-  /* Opt-in utility for content that may contain long URLs/tokens */
-  .oorb-wrap-anywhere {
-    overflow-wrap: anywhere;
+@layer base {
+  html,
+  body {
+    @apply m-0 p-0 overflow-x-hidden;
   }
 }

@@ -93,7 +93,9 @@ const formSchema = new mongoose.Schema({
     email: String,
     token: String,
     invitedAt: { type: Date, default: Date.now }
-  }]
+  }],
+  viewsByCountry: { type: Map, of: Number, default: {} },
+  viewsByDate: { type: Map, of: Number, default: {} }
 });
 
 formSchema.pre('save', function (next) {

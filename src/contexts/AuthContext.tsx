@@ -22,6 +22,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<boolean>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
+  verifyOTP: (email: string, otp: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (profileData: any) => Promise<boolean>;
   getInitials: () => string;
@@ -134,16 +135,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (name: string, email: string, password: string): Promise<boolean> => {
     try {
-      console.log('Auth Context: Attempting registration for:', email);
+      console.log('Auth Context: Attempting registration/OTP for:', email);
       const response = await authAPI.register({ name, email, password });
-      const { token, user: userData } = response.data;
+      
+      console.log('Auth Context: OTP request successful');
+      toast.success(response.data.message || 'Verification code sent to your email!');
+      return true;
+    } catch (error: any) {
+      console.error('Auth Context: Registration/OTP error:', error.response?.data || error.message);
+      toast.error(error.response?.data?.error || 'Registration failed');
+      return false;
+    }
+  };
 
-      console.log('Auth Context: Registration response received:', {
-        hasToken: !!token,
-        hasUser: !!userData,
-        userName: userData?.name,
-        userEmail: userData?.email
-      });
+  const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
+    try {
+      console.log('Auth Context: Verifying OTP for:', email);
+      const response = await authAPI.verifyOTP({ email, otp });
+      const { token, user: userData } = response.data;
 
       if (!token || !userData) {
         throw new Error('Invalid response from server - missing token or user data');
@@ -156,12 +165,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Update state
       setUser(userData);
 
-      console.log('Auth Context: Registration successful, user state updated');
-      toast.success('Registration successful!');
+      console.log('Auth Context: Verification successful, user state updated');
+      toast.success('Email verified and logged in successfully!');
       return true;
     } catch (error: any) {
-      console.error('Auth Context: Registration error:', error.response?.data || error.message);
-      toast.error(error.response?.data?.error || 'Registration failed');
+      console.error('Auth Context: Verification error:', error.response?.data || error.message);
+      toast.error(error.response?.data?.error || 'Verification failed');
       return false;
     }
   };
@@ -207,6 +216,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     login,
     register,
+    verifyOTP,
     logout,
     updateProfile,
     getInitials

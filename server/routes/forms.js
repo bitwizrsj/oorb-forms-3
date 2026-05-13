@@ -77,9 +77,16 @@ router.get('/share/:shareUrl', async (req, res) => {
 // Increment view count (public)
 router.post('/share/:shareUrl/view', async (req, res) => {
   try {
+    const { country = 'Unknown' } = req.body || {};
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    const incObj = { views: 1 };
+    incObj[`viewsByCountry.${country}`] = 1;
+    incObj[`viewsByDate.${dateStr}`] = 1;
+
     const form = await Form.findOneAndUpdate(
       { shareUrl: req.params.shareUrl },
-      { $inc: { views: 1 } },
+      { $inc: incObj },
       { new: true }
     );
     if (!form) return res.status(404).json({ error: 'Form not found' });
@@ -243,5 +250,6 @@ router.get('/:id/analytics', authenticateToken, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 export default router;

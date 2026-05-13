@@ -52,10 +52,15 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     console.log('Auth middleware - User found:', {
-      id: user._id,
-      email: user.email,
-      name: user.name
+      name: user.name,
+      isVerified: user.isVerified
     });
+
+    // Check if verified
+    if (!user.isVerified) {
+      console.log('Auth middleware - User not verified:', user.email);
+      return res.status(403).json({ error: 'Please verify your email address to access this resource.' });
+    }
 
     // Attach user to request
     req.user = user;

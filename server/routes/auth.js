@@ -26,29 +26,110 @@ const transporter = createTransport({
   }
 });
 
-// Register
+// Helper to generate 6-digit OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Send OTP (Repurposed Register)
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    console.log('Registration attempt:', { name, email });
+    console.log('OTP Request/Registration attempt:', { name, email });
 
-    // Validate input
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    let user = await User.findOne({ email: email.toLowerCase().trim() });
+    
+    if (user && user.isVerified) {
       return res.status(400).json({ error: 'User already exists with this email' });
     }
 
-    // Create new user
-    const user = new User({ name, email, password });
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    if (!user) {
+      // Create unverified user
+      user = new User({
+        name,
+        email: email.toLowerCase().trim(),
+        password,
+        isVerified: false
+      });
+    } else {
+      // Update existing unverified user
+      user.name = name;
+      user.password = password;
+    }
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
     await user.save();
 
-    console.log('User created successfully:', user._id);
+    // Send email
+    if (process.env.EMAIL_USER) {
+      await transporter.sendMail({
+        from: `"OORB Forms" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: '🔐 Your Verification Code - OORB Forms',
+        html: `
+          <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+            <div style="background:#4F46E5;padding:24px;text-align:center">
+              <h1 style="color:#fff;margin:0;font-size:24px;font-weight:700">Verify Your Email</h1>
+            </div>
+            <div style="padding:32px;text-align:center">
+              <p style="color:#374151;font-size:16px;margin-bottom:24px">Hi <strong>${user.name}</strong>, use the code below to complete your registration.</p>
+              <div style="background:#F3F4F6;padding:16px;border-radius:8px;display:inline-block">
+                <span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#1F2937">${otp}</span>
+              </div>
+              <p style="color:#6B7280;font-size:14px;margin-top:24px">This code will expire in <strong>10 minutes</strong>.</p>
+            </div>
+            <div style="background:#F9FAFB;padding:16px;text-align:center;border-top:1px solid #E5E7EB">
+              <p style="margin:0;font-size:12px;color:#9CA3AF">If you didn't request this code, you can safely ignore this email.</p>
+            </div>
+          </div>
+        `
+      });
+      console.log(`📧 OTP sent to ${user.email}`);
+    } else {
+      console.warn('EMAIL_USER not set — OTP is:', otp);
+    }
+
+    res.status(200).json({ message: 'OTP sent to your email' });
+  } catch (error) {
+    console.error('Registration/OTP error:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Verify OTP
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required' });
+    }
+
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim(),
+      otp,
+      otpExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Mark as verified
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
 
     // Generate JWT token
     const token = jwt.sign(
@@ -57,7 +138,6 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Return user data (without password)
     const userData = {
       _id: user._id,
       name: user.name,
@@ -68,16 +148,14 @@ router.post('/register', async (req, res) => {
       createdAt: user.createdAt
     };
 
-    console.log('Registration successful, sending response');
-
-    res.status(201).json({
-      message: 'User registered successfully',
+    res.status(200).json({
+      message: 'Email verified successfully',
       token,
       user: userData
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(400).json({ error: error.message });
+    console.error('Verification error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -105,6 +183,14 @@ router.post('/login', async (req, res) => {
     if (!isPasswordValid) {
       console.log('Invalid password for user:', email);
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check if verified
+    if (!user.isVerified) {
+      return res.status(401).json({ 
+        error: 'Please verify your email before logging in.',
+        unverified: true 
+      });
     }
 
     // Update last login
@@ -366,7 +452,8 @@ router.get('/google/callback', async (req, res) => {
         name: userInfo.data.name,
         email: userInfo.data.email,
         password: Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8), // Dummy password
-        avatar: userInfo.data.picture
+        avatar: userInfo.data.picture,
+        isVerified: true
       });
       await user.save();
     } else {

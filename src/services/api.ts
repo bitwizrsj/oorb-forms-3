@@ -80,6 +80,11 @@ export const authAPI = {
     return api.post('/auth/register', userData);
   },
 
+  verifyOTP: (data: { email: string; otp: string }) => {
+    console.log('Auth API: Verifying OTP for:', data.email);
+    return api.post('/auth/verify-otp', data);
+  },
+
   logout: () => {
     console.log('Auth API: Logging out');
     return api.post('/auth/logout');
@@ -128,9 +133,9 @@ export const formAPI = {
     return api.get(`/forms/share/${shareUrl}`);
   },
 
-  incrementView: (shareUrl: string) => {
+  incrementView: (shareUrl: string, country?: string) => {
     console.log('Form API: Incrementing view for share URL:', shareUrl);
-    return api.post(`/forms/share/${shareUrl}/view`);
+    return api.post(`/forms/share/${shareUrl}/view`, { country });
   },
 
   createForm: (formData: any) => {

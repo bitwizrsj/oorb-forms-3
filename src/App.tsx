@@ -11,6 +11,10 @@ import EnhancedOorbFormsApp from './components/forms/EnhancedOorbFormsApp';
 import AIChatInterface from './components/chat/AIChatInterface';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import AcceptInvitation from './components/forms/AcceptInvitation';
+import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
+import LandingPage from './components/landing/LandingPage';
+import DocumentationPage from './components/landing/DocumentationPage';
+
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -103,8 +107,16 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         } />
 
-        {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/ai-chat" replace />} />
+        <Route path="/superadmin" element={
+          <ProtectedRoute>
+            <SuperAdminDashboard />
+          </ProtectedRoute>
+        } />
+
+        {/* Default route */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/documentation" element={<DocumentationPage />} />
+
       </Routes>
 
       <Toaster

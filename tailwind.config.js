@@ -13,18 +13,26 @@ export default {
         purple: '#6B4BFF',
       },
       fontFamily: {
+        outfit: ['Outfit', 'sans-serif'],
         orbitron: ['Orbitron', 'sans-serif'],
         poppins: ['Poppins', 'sans-serif'],
       },
+
       animation: {
         'orbit': 'orbit 20s linear infinite',
+        'gradient': 'gradient 8s linear infinite',
       },
       keyframes: {
         orbit: {
           '0%': { transform: 'rotate(0deg)' },
           '100%': { transform: 'rotate(360deg)' },
+        },
+        gradient: {
+          '0%, 100%': { 'background-position': '0% 50%' },
+          '50%': { 'background-position': '100% 50%' },
         }
       },
+
       boxShadow: {
         'glow': '0 0 20px rgba(107, 75, 255, 0.5)',
       }

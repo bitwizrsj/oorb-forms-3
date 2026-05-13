@@ -117,7 +117,14 @@ const FormRenderer: React.FC = () => {
         // View count
         const sessionKey = `viewed_${formData._id}`;
         if (!sessionStorage.getItem(sessionKey)) {
-          formAPI.incrementView(shareUrl).catch(err => console.error('Error incrementing view:', err));
+          let locationRaw = 'Unknown';
+          try {
+             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+             if (tz) {
+                locationRaw = tz.split('/').pop()?.replace(/_/g, ' ') || tz;
+             }
+          } catch(e) {}
+          formAPI.incrementView(shareUrl, locationRaw).catch(err => console.error('Error incrementing view:', err));
           sessionStorage.setItem(sessionKey, 'true');
         }
         
